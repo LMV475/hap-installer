@@ -116,7 +116,6 @@ export struct More {
   }
 
   private openSignConfig(): void {
-    AppStorage.setOrCreate<number>('selectedTab', 0);
     AppStorage.setOrCreate<number>('signSheetRequest', Date.now());
   }
 

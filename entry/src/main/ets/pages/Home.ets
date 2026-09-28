@@ -37,13 +37,15 @@ export struct Home {
   @State p7bPath: string = '';
   @State p12Path: string = '';
   @State keyPwd: string = '';
-  @State keyAlias: string = 'test';
+  @State keyAlias: string = '';
   @State signedPath: string = '';
   @State udid: string = '';
   @State csrPath: string = '';
   @State agcUser: string = '';
   @State packageName: string = '';
   @State matLabel: string = '证书材料未选择';
+  /** 材料来源：'builtin' = 默认使用内置测试链；'custom' = 用户在「签名配置」里自配置的材料 */
+  @State matSource: string = 'builtin';
   @State logs: string[] = [];
   @State connectSheetOpen: boolean = false;
   @State signSheetOpen: boolean = false;
@@ -239,6 +241,7 @@ export struct Home {
         this.p12Path = await this.downloadTo(parts[2], 'app.p12');
         this.keyPwd = parts[3];
         this.keyAlias = parts[4];
+        this.matSource = 'custom';
         this.matLabel = '材料就绪（alias=' + this.keyAlias + '）';
         this.log('[auto] 签名材料已就绪');
         const autoExport: string | undefined = AppStorage.get<string>('autoExport');
@@ -378,6 +381,7 @@ export struct Home {
     }
     const ready: number = (this.cerPath.length > 0 ? 1 : 0) + (this.p7bPath.length > 0 ? 1 : 0) +
       (this.p12Path.length > 0 ? 1 : 0);
+    this.matSource = 'custom';
     this.matLabel = '证书材料 ' + ready + '/3 已选（含网页下载）';
     this.log('网页下载材料已导入: ' + path);
     this.saveConfig();
@@ -394,6 +398,7 @@ export struct Home {
       await store.put('p7bPath', this.p7bPath);
       await store.put('p12Path', this.p12Path);
       await store.put('keyAlias', this.keyAlias);
+      await store.put('matSource', this.matSource);
       if (this.udid.length === 64) {
         await store.put('udid', this.udid);
       }
@@ -420,9 +425,10 @@ export struct Home {
       const p7b: string = await store.get('p7bPath', '') as string;
       const p12: string = await store.get('p12Path', '') as string;
       const alias: string = await store.get('keyAlias', this.keyAlias) as string;
+      const matSource: string = await store.get('matSource', this.matSource) as string;
       const cachedUdid: string = await store.get('udid', '') as string;
       this.target = target;
-      this.keyAlias = alias;
+      this.matSource = matSource;
       if (cachedUdid.length === 64) {
         this.udid = cachedUdid;
       }
@@ -435,6 +441,14 @@ export struct Home {
       if (p12.length > 0 && fileIo.accessSync(p12)) {
         this.p12Path = p12;
       }
+      // 内置测试链：alias/口令不回填输入框（保持「默认无填充」），
+      // 留空时由 useAlias()/usePwd() 按内置默认值兜底
+      if (this.p12Path === this.ctx().filesDir + '/hapinstaller.p12') {
+        this.keyAlias = '';
+        this.keyPwd = '';
+      } else {
+        this.keyAlias = alias;
+      }
       if (cachedHap.length > 0 && fileIo.accessSync(cachedHap)) {
         this.applyPicked(cachedHap);
         this.log('恢复上次选中的安装包: ' + cachedHap);
@@ -446,7 +460,9 @@ export struct Home {
       }
       const ready: number = (this.cerPath.length > 0 ? 1 : 0) + (this.p7bPath.length > 0 ? 1 : 0) +
         (this.p12Path.length > 0 ? 1 : 0);
-      this.matLabel = ready === 3 ? '证书材料已就绪（来自上次配置）' : ('证书材料 ' + ready + '/3 已选');
+      this.matLabel = this.matSource !== 'custom'
+        ? '内置测试链（alias=hapinstaller）'
+        : (ready === 3 ? '证书材料已就绪（来自上次配置）' : ('证书材料 ' + ready + '/3 已选'));
       const jwt: string = await store.get('agcJwt', '') as string;
       const access: string = await store.get('agcAccess', '') as string;
       const uid: string = await store.get('agcUser', '') as string;
@@ -477,6 +493,42 @@ export struct Home {
   private healMaterials(): string[] {
     const f: string = this.ctx().filesDir;
     const healed: string[] = [];
+    const builtinP12: string = f + '/hapinstaller.p12';
+    // 默认使用内置测试链。自定义密钥库的口令出于安全考虑不落盘（见 README「未开源模块」），
+    // 冷启动无法续用，故只有在「签名配置」里主动配过材料（matSource === 'custom'）
+    // 才保留自定义材料；想改用自定义材料，打开「签名配置」重新选择并填入口令。
+    if (this.matSource !== 'custom') {
+      const freshCer: string = f + '/hapinstaller-debug.cer';
+      const freshP7b: string = f + '/hapinstaller-debug.p7b';
+      const builtinCer: string = f + '/hapinstaller-builtin.cer';
+      const builtinP7b: string = f + '/hapinstaller-builtin.p7b';
+      if (!fileIo.accessSync(builtinP12)) {
+        this.releaseBuiltin('hapinstaller.p12');
+      }
+      if (fileIo.accessSync(builtinP12) && this.p12Path !== builtinP12) {
+        this.p12Path = builtinP12;
+        healed.push('密钥库(内置)');
+      }
+      if (!fileIo.accessSync(freshCer) && !fileIo.accessSync(builtinCer)) {
+        this.releaseBuiltin('hapinstaller-builtin.cer');
+      }
+      const cerPick: string = fileIo.accessSync(freshCer) ? freshCer : builtinCer;
+      if (fileIo.accessSync(cerPick) && this.cerPath !== cerPick) {
+        this.cerPath = cerPick;
+        healed.push('证书链(内置)');
+      }
+      if (!fileIo.accessSync(freshP7b) && !fileIo.accessSync(builtinP7b)) {
+        this.releaseBuiltin('hapinstaller-builtin.p7b');
+      }
+      const p7bPick: string = fileIo.accessSync(freshP7b) ? freshP7b : builtinP7b;
+      if (fileIo.accessSync(p7bPick) && this.p7bPath !== p7bPick) {
+        this.p7bPath = p7bPick;
+        healed.push('Profile(内置)');
+      }
+      // 内置链的 alias/口令不再回填输入框（保持「默认无填充」）：
+      // 留空时由 useAlias()/usePwd() 在签名时按内置默认值兜底
+      return healed;
+    }
     if (this.p12Path.length === 0 || !fileIo.accessSync(this.p12Path)) {
       const def: string = f + '/hapinstaller.p12';
       if (!fileIo.accessSync(def)) {
@@ -510,11 +562,6 @@ export struct Home {
         this.p7bPath = pick;
         healed.push('Profile');
       }
-    }
-    if (this.keyPwd.length === 0 && this.p12Path === f + '/hapinstaller.p12') {
-      this.keyPwd = 'hapinstaller123';
-      this.keyAlias = 'hapinstaller';
-      healed.push('口令(仅内存)');
     }
     return healed;
   }
@@ -639,8 +686,7 @@ export struct Home {
         this.log('证书已下载: ' + cerPath);
       }
       this.p12Path = this.ctx().filesDir + '/hapinstaller.p12';
-      this.keyAlias = 'hapinstaller';
-      this.keyPwd = 'hapinstaller123';
+      this.matSource = 'builtin';
       await this.saveConfig();
       this.status = '证书就绪';
     } catch (e) {
@@ -700,6 +746,11 @@ export struct Home {
         ids.push(d.id);
       }
       const certs: AgcCertInfo[] = await AgcService.getCertList();
+      const seen: string[] = [];
+      for (const c of certs) {
+        seen.push(c.certName + '(id=' + c.id + ',status=' + c.status + ')');
+      }
+      this.log('AGC 证书列表: ' + (seen.length > 0 ? seen.join('、') : '（空）'));
       let certId: string = '';
       for (const c of certs) {
         if (c.certName === 'hapinstaller-debug') {
@@ -707,7 +758,22 @@ export struct Home {
         }
       }
       if (certId.length === 0) {
-        this.log('没有可用证书，请先申请证书');
+        // 签名只能用本机持有的密钥库，所以 Profile 只能绑定「由本机 CSR 签发」的证书；
+        // 账号里没有就现场申请（去网页手工申请会绑到别的密钥上，签出来装不上）
+        this.log('未找到 hapinstaller-debug 证书，自动用内置 CSR 申请一张…');
+        this.busy = false;
+        await this.doApplyCert();
+        this.busy = true;
+        const again: AgcCertInfo[] = await AgcService.getCertList();
+        for (const c of again) {
+          if (c.certName === 'hapinstaller-debug') {
+            certId = c.id;
+          }
+        }
+      }
+      if (certId.length === 0) {
+        this.log('证书仍不可用：AGC 调试证书数量超限。请到「签名配置 → 打开 AGC」的「证书管理」里删掉不用的调试证书'
+          + '（务必保留 DevEco 自动签名那张，删了 DevEco 就编译不了本应用），再点「开始调试」重试');
         this.busy = false;
         return;
       }
@@ -758,7 +824,8 @@ export struct Home {
       this.p7bPath = fileIo.accessSync(freshP7b) ? freshP7b : this.ctx().filesDir + '/hapinstaller-builtin.p7b';
       this.keyAlias = 'hapinstaller';
       this.keyPwd = 'hapinstaller123';
-      this.matLabel = '证书材料 3/3（alias=hapinstaller）';
+      this.matSource = 'builtin';
+      this.matLabel = '内置测试链（alias=hapinstaller）';
       await this.saveConfig();
       this.log('内置材料就绪：alias=hapinstaller，可直接签名');
     } catch (e) {
@@ -786,6 +853,7 @@ export struct Home {
       this.log(this.readTextOr(this.ctx().tempDir + '/sign.out'));
       if (fileIo.accessSync(p12)) {
         this.p12Path = p12;
+        this.matSource = 'custom';
         this.log('密钥库已生成: ' + p12 + ' (' + fileIo.statSync(p12).size + ' bytes)');
         await this.saveConfig();
       }
@@ -802,14 +870,20 @@ export struct Home {
       this.log('请先生成密钥库或导入 .p12');
       return;
     }
+    const alias: string = this.useAlias();
+    const pwd: string = this.usePwd();
+    if (alias.length === 0 || pwd.length === 0) {
+      this.log('请先填 keyAlias 与密码');
+      return;
+    }
     this.busy = true;
     const csr: string = this.ctx().filesDir + '/app.csr';
     try {
-      const subject: string = 'CN=' + this.keyAlias.trim();
-      const cmd: string = 'signtool generate-csr -keyAlias ' + this.keyAlias.trim() +
-        ' -keyPwd ' + this.keyPwd + ' -subject ' + subject + ' -signAlg SHA256withECDSA' +
-        ' -keystoreFile ' + this.p12Path + ' -keystorePwd ' + this.keyPwd + ' -outFile ' + csr;
-      this.log('$ ' + cmd.replace(this.keyPwd, '***'));
+      const subject: string = 'CN=' + alias;
+      const cmd: string = 'signtool generate-csr -keyAlias ' + alias +
+        ' -keyPwd ' + pwd + ' -subject ' + subject + ' -signAlg SHA256withECDSA' +
+        ' -keystoreFile ' + this.p12Path + ' -keystorePwd ' + pwd + ' -outFile ' + csr;
+      this.log('$ ' + cmd.replace(pwd, '***'));
       const outcome: SignOutcome = await SignService.sign(cmd, this.ctx().tempDir);
       this.log('生成 CSR 返回码: ' + outcome.code);
       this.log(this.readTextOr(this.ctx().tempDir + '/sign.out'));
@@ -929,16 +1003,32 @@ export struct Home {
 
   private async pickMat(kind: string): Promise<void> {
     try {
+      let picked: string = '';
       if (kind === 'cer') {
-        this.cerPath = await this.pickFile(['.cer'], 'chain.cer');
+        picked = await this.pickFile(['.cer'], 'chain.cer');
+        if (picked.length > 0) {
+          this.cerPath = picked;
+        }
       } else if (kind === 'p7b') {
-        this.p7bPath = await this.pickFile(['.p7b'], 'profile.p7b');
+        picked = await this.pickFile(['.p7b'], 'profile.p7b');
+        if (picked.length > 0) {
+          this.p7bPath = picked;
+        }
       } else {
-        this.p12Path = await this.pickFile(['.p12', '.jks'], 'app.p12');
+        picked = await this.pickFile(['.p12', '.jks'], 'app.p12');
+        if (picked.length > 0) {
+          this.p12Path = picked;
+        }
       }
+      if (picked.length === 0) {
+        this.log('未选择文件，材料保持不变');
+        return;
+      }
+      // 用户主动选了自定义材料：切到 custom 模式，不再被内置链覆盖
+      this.matSource = 'custom';
       const ready: number = (this.cerPath.length > 0 ? 1 : 0) + (this.p7bPath.length > 0 ? 1 : 0) +
         (this.p12Path.length > 0 ? 1 : 0);
-      this.matLabel = '证书材料 ' + ready + '/3 已选';
+      this.matLabel = '证书材料 ' + ready + '/3 已选（自定义）';
       await this.saveConfig();
     } catch (e) {
       const err = e as BusinessError;
@@ -964,12 +1054,36 @@ export struct Home {
       (this.hapBundle.length > 0 ? ' bundle=' + this.hapBundle : ' bundle=未识别(回退到输入项)'));
   }
 
+  /** 当前密钥库是否为内置测试链（内置的 alias/口令是固定值，输入框留空时按此兜底） */
+  private isBuiltinKeystore(): boolean {
+    return this.p12Path === this.ctx().filesDir + '/hapinstaller.p12';
+  }
+
+  /** 生效 alias：输入框优先，留空且为内置密钥库时用内置默认值 */
+  private useAlias(): string {
+    const t: string = this.keyAlias.trim();
+    if (t.length > 0) {
+      return t;
+    }
+    return this.isBuiltinKeystore() ? 'hapinstaller' : '';
+  }
+
+  /** 生效口令：输入框优先，留空且为内置密钥库时用内置默认值（非内置件留空即视为未填） */
+  private usePwd(): string {
+    if (this.keyPwd.length > 0) {
+      return this.keyPwd;
+    }
+    return this.isBuiltinKeystore() ? 'hapinstaller123' : '';
+  }
+
   private buildSignCmd(inPath: string, outPath: string): string {
-    return 'signtool sign-app -mode localSign -keyAlias ' + this.keyAlias +
+    const alias: string = this.useAlias();
+    const pwd: string = this.usePwd();
+    return 'signtool sign-app -mode localSign -keyAlias ' + alias +
       ' -appCertFile ' + this.cerPath + ' -profileFile ' + this.p7bPath +
       ' -inFile ' + inPath + ' -signAlg SHA256withECDSA' +
-      ' -keystoreFile ' + this.p12Path + ' -keystorePwd ' + this.keyPwd +
-      ' -keyPwd ' + this.keyPwd + ' -outFile ' + outPath;
+      ' -keystoreFile ' + this.p12Path + ' -keystorePwd ' + pwd +
+      ' -keyPwd ' + pwd + ' -outFile ' + outPath;
   }
 
   private async doCsrExport(): Promise<void> {
@@ -1021,6 +1135,13 @@ export struct Home {
 
   /** 签名前校验：材料齐全 + 口令已填（避免退化到过期/缺失材料上白跑） */
   private precheckSign(): string[] {
+    // 先自愈一次：loadConfig 只在首屏 kernelReady 为 false 时跑，本页重建时可能不再跑，
+    // 导致配置里的材料路径已失效却没人回填。healMaterials 幂等（仅空/不存在时才回填内置件）。
+    const healed: string[] = this.healMaterials();
+    if (healed.length > 0) {
+      this.log('签名前自愈回填：' + healed.join('、'));
+      this.saveConfig();
+    }
     const missing: string[] = [];
     if (this.hapPath.length === 0 || !fileIo.accessSync(this.hapPath)) {
       missing.push('待签名包');
@@ -1036,8 +1157,11 @@ export struct Home {
     if (this.p12Path.length === 0 || !fileIo.accessSync(this.p12Path)) {
       missing.push('密钥库 .p12');
     }
-    if (this.keyPwd.length === 0) {
+    if (this.usePwd().length === 0) {
       missing.push('密钥口令');
+      // 口令出于安全考虑不落盘（见 §十七），冷启动必然为空；内置密钥库留空时自动兜底
+      this.log('密钥口令未填：当前密钥库 = ' + this.p12Path
+        + '（非内置件，口令需自行填写；想改用内置测试链请点「用内置材料」）');
     }
     return missing;
   }
@@ -1133,7 +1257,17 @@ export struct Home {
     const missing: string[] = this.precheckSign();
     if (missing.length > 0) {
       this.log('签名前校验未通过，缺少：' + missing.join('、'));
-      this.status = '材料不完整';
+      if (missing.indexOf('密钥口令') >= 0) {
+        // 口令出于安全考虑不落盘（§十七），冷启动必为空；只有内置密钥库能自动回填。
+        // 而「签名配置」面板是唯一的填写入口，其入口在 More 页要连点「应用版本」十下才出现，
+        // 普通用户根本找不到 —— 这里直接替用户打开，否则此路不通。
+        this.signSheetOpen = true;
+        this.status = '缺少密钥口令 —— 已打开「签名配置」，请在「keystore/key 密码」里填写';
+        this.log('已自动打开「签名配置」：在「keystore/key 密码」填入该密钥库的口令后重试；'
+          + '若想直接用内置测试链，点「用内置材料」一键补齐（口令 hapinstaller123）');
+      } else {
+        this.status = '材料不完整（缺少：' + missing.join('、') + '）';
+      }
       return;
     }
     const mismatch: string[] = this.profileMismatch();
@@ -1487,7 +1621,7 @@ export struct Home {
     }.width('100%').margin({ bottom: $r('sys.float.padding_level3') })
     Row({ space: 8 }) {
       HapInput({ text: $keyAlias, placeholder: 'keyAlias' }).layoutWeight(1)
-      HapInput({ text: $keyPwd, placeholder: 'keystore/key 密码', isPassword: true }).layoutWeight(1)
+      HapInput({ text: $keyPwd, placeholder: '密码', isPassword: true }).layoutWeight(1)
     }.width('100%').margin({ bottom: $r('sys.float.padding_level3') })
     Row({ space: 8 }) {
       PillButton({ label: '申请证书', enabled_: !this.busy,
@@ -1569,7 +1703,7 @@ export struct Home {
       }.width('100%')
       Row({ space: 8 }) {
         HapInput({ text: $keyAlias, placeholder: 'keyAlias' }).layoutWeight(1)
-        HapInput({ text: $keyPwd, placeholder: 'keystore/key 密码', isPassword: true }).layoutWeight(1)
+        HapInput({ text: $keyPwd, placeholder: '密码', isPassword: true }).layoutWeight(1)
       }.width('100%')
       Divider().color($r('sys.color.ohos_id_color_list_separator'))
       Text('AGC 证书 / Profile 申请')
