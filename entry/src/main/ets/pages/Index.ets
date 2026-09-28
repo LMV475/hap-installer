@@ -94,7 +94,7 @@ struct Index {
       }
       .width('100%')
       .height(TITLE_BAR_VP)
-      .padding({ left: 12, right: 12 })
+      .padding({ left: $r('sys.float.padding_level6'), right: $r('sys.float.padding_level6') })
       .margin({ top: this.getUIContext().px2vp(this.safeTopPx) + TITLE_TOP_GAP_VP })
       .alignItems(VerticalAlign.Center)
     }

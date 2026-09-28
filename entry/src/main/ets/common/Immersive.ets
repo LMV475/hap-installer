@@ -24,7 +24,7 @@ export const TITLE_MASK_ALPHA: number[] = [0.9, 0.9, 0.89, 0.87, 0.82, 0.68, 0.5
 export const TITLE_MASK_POS: number[] = [0, 0.28, 0.5, 0.65, 0.78, 0.85, 0.9, 0.94, 0.97, 1];
 export const PILL_BAR_VP: number = 56;
 export const PILL_BOTTOM_GAP_VP: number = 12;
-export const CONTENT_GAP_VP: number = 8;
+export const CONTENT_GAP_VP: number = 24;
 /** 胶囊内边距：选中项圆角 = 外圆角 - 内边距，两圈才同心 */
 export const PILL_ITEM_PAD_VP: number = 4;
 

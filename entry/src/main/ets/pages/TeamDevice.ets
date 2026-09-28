@@ -204,7 +204,7 @@ export struct TeamDevice {
           })
         }
         .width('100%')
-        .padding($r('sys.float.padding_level5'))
+        .padding($r('sys.float.padding_level6'))
       }
       .width('100%')
       .height('100%')

@@ -116,7 +116,7 @@ export struct DebugDetail {
       }
       .width('100%')
       .height('100%')
-      .padding($r('sys.float.padding_level5'))
+      .padding($r('sys.float.padding_level6'))
     }
     .padding(safeAreaInsets(this.getUIContext(), this.safeTopPx, this.safeBottomPx))
     .title('调试详情')

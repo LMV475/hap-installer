@@ -1690,6 +1690,7 @@ export struct Home {
           onButtonTap: (): void => { this.doLogin(); }
         })
         Divider().color($r('sys.color.ohos_id_color_list_separator'))
+          .visibility(this.agcUser.length > 0 ? Visibility.Visible : Visibility.None)
         HomeSettingItem({
           title: this.target.length > 0 ? this.target : '未连接',
           description: '设备',
@@ -1715,7 +1716,7 @@ export struct Home {
         })
       }
       .width('100%')
-      .padding({ left: $r('sys.float.padding_level5'), right: $r('sys.float.padding_level5'),
+      .padding({ left: $r('sys.float.padding_level6'), right: $r('sys.float.padding_level6'),
         top: $r('sys.float.padding_level2'), bottom: $r('sys.float.padding_level2') })
       .borderRadius($r('sys.float.corner_radius_level6'))
       .backgroundColor($r('sys.color.ohos_id_color_card_bg'))
@@ -1747,7 +1748,7 @@ export struct Home {
     }
     .width('100%')
     .height('100%')
-    .padding({ left: $r('sys.float.padding_level5'), right: $r('sys.float.padding_level5'),
+    .padding({ left: $r('sys.float.padding_level6'), right: $r('sys.float.padding_level6'),
       top: topInsetVp(this.getUIContext(), this.safeTopPx),
       bottom: bottomInsetVp(this.getUIContext(), this.safeBottomPx) })
     .backgroundColor($r('sys.color.ohos_id_color_sub_background'))

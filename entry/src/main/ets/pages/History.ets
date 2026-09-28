@@ -128,7 +128,7 @@ export struct History {
         .justifyContent(FlexAlign.Center)
       }
       .width('100%')
-      .padding({ left: $r('sys.float.padding_level5'), right: $r('sys.float.padding_level5'),
+      .padding({ left: $r('sys.float.padding_level6'), right: $r('sys.float.padding_level6'),
         top: topInsetVp(this.getUIContext(), this.safeTopPx),
         bottom: bottomInsetVp(this.getUIContext(), this.safeBottomPx) })
       .alignItems(HorizontalAlign.Start)
@@ -137,6 +137,8 @@ export struct History {
     .height('100%')
     .backgroundColor($r('sys.color.ohos_id_color_sub_background'))
     .align(Alignment.TopStart)
+    .edgeEffect(EdgeEffect.Spring)
+    .scrollBar(BarState.Off)
   }
 
   @Builder

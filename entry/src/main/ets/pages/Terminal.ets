@@ -153,7 +153,7 @@ export struct Terminal {
       }
       .width('100%')
       .height('100%')
-      .padding({ left: 16, right: 16 })
+      .padding({ left: $r('sys.float.padding_level6'), right: $r('sys.float.padding_level6') })
     }
     .padding(safeAreaInsets(this.getUIContext(), this.safeTopPx, this.safeBottomPx))
     .title('命令行工具')
