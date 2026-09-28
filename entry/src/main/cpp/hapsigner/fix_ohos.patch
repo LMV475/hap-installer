@@ -1,29 +1,466 @@
+diff --git a/hapsigntool_cpp/codesigning/fsverity/include/merkle_tree_builder.h b/hapsigntool_cpp/codesigning/fsverity/include/merkle_tree_builder.h
+index 4cba46f..0fb8b82 100644
+--- a/hapsigntool_cpp/codesigning/fsverity/include/merkle_tree_builder.h
++++ b/hapsigntool_cpp/codesigning/fsverity/include/merkle_tree_builder.h
+@@ -23,6 +23,7 @@
+ #include <sstream>
+ 
+ #include "thread_pool.h"
++#include "sign_thread_pool.h"
+ #include "byte_buffer.h"
+ #include "merkle_tree.h"
+ #include "fs_digest_utils.h"
+@@ -64,9 +65,10 @@
+                               FsVerityHashAlgorithm fsVerityHashAlgorithm);
+     void DataRoundupChunkSize(ByteBuffer* data, long originalDataSize, int digestSize);
+     bool CheckCalculateHashResult;
+-    const int POOL_SIZE = std::min(MAX_PROCESSORS, static_cast<int>(std::thread::hardware_concurrency()));
++    // 与 GetSharedSignPool() 的 worker 数保持一致（1），仅用作本 builder 的 in-flight 任务节流上限
++    const int POOL_SIZE = 1;
+     std::string mAlgorithm = "SHA-256";
+-    std::shared_ptr<Uscript::ThreadPool> mPools;
++    std::shared_ptr<Uscript::ThreadPool> mPools; // 指向进程级 GetSharedSignPool()，见 sign_thread_pool.h
+ };
+ } // namespace SignatureTools
+ } // namespace OHOS
+diff --git a/hapsigntool_cpp/codesigning/fsverity/include/sign_thread_pool.h b/hapsigntool_cpp/codesigning/fsverity/include/sign_thread_pool.h
+new file mode 100644
+index e69de29..07f4e8f 100644
+--- /dev/null
++++ b/hapsigntool_cpp/codesigning/fsverity/include/sign_thread_pool.h
+@@ -0,0 +1,35 @@
++/*
++ * Copyright (c) 2024-2024 Huawei Device Co., Ltd.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++#ifndef SIGNATRUETOOLS_SIGN_THREAD_POOL_H
++#define SIGNATRUETOOLS_SIGN_THREAD_POOL_H
++
++#include <memory>
++#include "thread_pool.h"
++
++namespace OHOS {
++namespace SignatureTools {
++// 端侧签名进程级共享线程池：
++// - 池大小 = 1：规避设备沙箱内多线程触发的 signo(42)（详见鸿蒙迁移方案.md §廿一）
++// - 全进程唯一：避免每个 MerkleTreeBuilder / CodeSigning 实例各自 new ThreadPool 造成线程反复起停
++// 前提：HandleZipGlobalInfo 已改串行（方案 A），任务内部不再向本池 Enqueue，因此 1 线程池不会自锁。
++inline std::shared_ptr<Uscript::ThreadPool> GetSharedSignPool()
++{
++    static const std::shared_ptr<Uscript::ThreadPool> pool =
++        std::make_shared<Uscript::ThreadPool>(1);
++    return pool;
++}
++} // namespace SignatureTools
++} // namespace OHOS
++#endif
 diff --git a/hapsigntool_cpp/codesigning/fsverity/include/thread_pool.h b/hapsigntool_cpp/codesigning/fsverity/include/thread_pool.h
-index 5de49d8..efeb016 100644
+index 5de49d8..756c351 100644
 --- a/hapsigntool_cpp/codesigning/fsverity/include/thread_pool.h
 +++ b/hapsigntool_cpp/codesigning/fsverity/include/thread_pool.h
-@@ -35,6 +35,7 @@ public:
-     ThreadPool(size_t threads = TASK_NUM)
-         : m_stop(false)
-     {
-+        threads = 1;
-         for (size_t i = 0; i < threads; ++i)
-             m_workers.emplace_back([this] {
-             std::function<void()> task;
+@@ -25,7 +25,7 @@
+ #include <functional>
+ #include <stdexcept>
+ 
+-#define TASK_NUM (std::thread::hardware_concurrency())
++#define TASK_NUM (std::thread::hardware_concurrency() > 0 ? std::thread::hardware_concurrency() : 4)
+ 
+ namespace OHOS {
+ namespace SignatureTools {
+@@ -49,7 +49,6 @@
+                 lock.unlock();
+                 task();
+                 lock.lock();
+-                m_conditionMax.notify_one();
+             }
+         });
+     }
+@@ -65,12 +64,10 @@
+         std::future<returnType> res = task->get_future();
+         {
+             std::unique_lock<std::mutex> lock(m_queueMutex);
+-            while (m_stop == false && m_tasks.size() >= TASK_NUM) {
+-                m_conditionMax.wait(lock, [this] { return m_stop || m_tasks.size() < TASK_NUM; });
+-            }
++            // 无界队列：不再因队列长度阻塞生产者（有界队列 + future 批量等待会死锁）
+             m_tasks.emplace([task] () { (*task)(); });
+-            m_condition.notify_one();
+         }
++        m_condition.notify_one();
+         return res;
+     }
+ 
+diff --git a/hapsigntool_cpp/codesigning/fsverity/src/merkle_tree_builder.cpp b/hapsigntool_cpp/codesigning/fsverity/src/merkle_tree_builder.cpp
+index 6705c42..0c7b1dc 100644
+--- a/hapsigntool_cpp/codesigning/fsverity/src/merkle_tree_builder.cpp
++++ b/hapsigntool_cpp/codesigning/fsverity/src/merkle_tree_builder.cpp
+@@ -13,9 +13,14 @@
+  * limitations under the License.
+  */
+ #include <cmath>
++#include <chrono>
++#include <utility>
++#include <exception>
+ 
+ #include "merkle_tree_builder.h"
+ 
++#include "../../trace_log.h"
++
+ using namespace OHOS::SignatureTools::Uscript;
+ namespace OHOS {
+ namespace SignatureTools {
+@@ -55,8 +60,12 @@
+ {
+     int count = (int)(GetChunkCount(size, MAX_READ_SIZE));
+     int chunks = (int)(GetChunkCount(size, CHUNK_SIZE));
++    SIGNTRACE("[MARK] mth: enter GetDataHashes\n");
++    SIGNTRACE( "[MARK] env: hw=%u MAX_PROC=%d POOL_SIZE=%d TASK_NUM=%u count=%d chunks=%d\n",
++            (unsigned)std::thread::hardware_concurrency(), (int)MAX_PROCESSORS, (int)POOL_SIZE, (unsigned)TASK_NUM, count, chunks);
+     std::vector<std::vector<int8_t>> hashes(chunks);
+-    std::vector<std::future<void>> thread_results;
++    // (future, readChunkIndex) —— 定位到具体 worker/chunk 便于超时/异常打点
++    std::vector<std::pair<std::future<void>, int>> thread_results;
+     long readOffset = 0L;
+     for (int i = 0; i < count; i++) {
+         long readLimit = std::min(readOffset + MAX_READ_SIZE, size);
+@@ -91,13 +100,51 @@
+         }
+         byteBuffer->Flip();
+         int readChunkIndex = (int)(GetFullChunkSize(MAX_READ_SIZE, CHUNK_SIZE, i));
+-        thread_results.push_back(mPools->Enqueue(&MerkleTreeBuilder::RunHashTask, this, std::ref(hashes),
+-                                                 byteBuffer, readChunkIndex, 0));
++        std::future<void> fut = mPools->Enqueue(&MerkleTreeBuilder::RunHashTask, this, std::ref(hashes),
++                                                byteBuffer, readChunkIndex, 0);
++        thread_results.emplace_back(std::move(fut), readChunkIndex);
++        // 流式收敛：在飞任务数达到上限就等最早的一个，避免积压与批量等待
++        if (thread_results.size() >= static_cast<size_t>(POOL_SIZE)) {
++            std::future<void>& headFut = thread_results.front().first;
++            int headChunk = thread_results.front().second;
++            auto st = headFut.wait_for(std::chrono::seconds(30));
++            if (st == std::future_status::timeout) {
++                SIGNTRACE("[MARK] mth: TIMEOUT(streaming) chunk=%d\n", headChunk);
++            } else {
++                try {
++                    headFut.get();
++                } catch (const std::exception& e) {
++                    SIGNTRACE("[MARK] mth: EXCEPT(streaming) chunk=%d what=%s\n", headChunk, e.what());
++                } catch (...) {
++                    SIGNTRACE("[MARK] mth: EXCEPT(streaming) chunk=%d unknown\n", headChunk);
++                }
++            }
++            thread_results.erase(thread_results.begin());
++        }
+         readOffset += readSize;
++        if (i % 20 == 0 || i == count - 1) {
++            SIGNTRACE("[MARK] mth: enqueued %d/%d lastChunk=%d\n", i + 1, count, readChunkIndex);
++        }
+     }
+-    for (auto& thread_result : thread_results) {
+-        thread_result.wait();
++    SIGNTRACE("[MARK] mth: enqueue done, waiting remaining=%d\n", (int)thread_results.size());
++    int waited = 0;
++    for (auto& entry : thread_results) {
++        auto st = entry.first.wait_for(std::chrono::seconds(5));
++        if (st == std::future_status::timeout) {
++            SIGNTRACE("[MARK] mth: TIMEOUT chunk=%d (waited %d/%d)\n",
++                      entry.second, waited, (int)thread_results.size());
++        } else {
++            try {
++                entry.first.get();
++            } catch (const std::exception& e) {
++                SIGNTRACE("[MARK] mth: EXCEPT chunk=%d what=%s\n", entry.second, e.what());
++            } catch (...) {
++                SIGNTRACE("[MARK] mth: EXCEPT chunk=%d unknown\n", entry.second);
++            }
++        }
++        waited++;
+     }
++    SIGNTRACE("[MARK] mth: all tasks done\n");
+     return hashes;
+ }
+ 
+@@ -139,26 +186,44 @@
+ void MerkleTreeBuilder::RunHashTask(std::vector<std::vector<int8_t>>& hashes,
+                                     ByteBuffer* buffer, int readChunkIndex, int bufStartIdx)
+ {
+-    int offset = 0;
++    SIGNTRACE("[MARK] mth: task start chunk=%d\n", readChunkIndex);
++    int processed = 0;
++    try {
++        int offset = 0;
+ 
+-    std::shared_ptr<ByteBuffer> bufferPtr(buffer);
+-    int bufferSize = bufferPtr->GetCapacity();
+-    int index = readChunkIndex;
+-    while (offset < bufferSize) {
+-        ByteBuffer* chunk = Slice(bufferPtr.get(), offset, offset + CHUNK_SIZE);
+-        std::vector<int8_t> tmpByte(CHUNK_SIZE);
+-        chunk->GetData(offset + bufStartIdx, tmpByte.data(), CHUNK_SIZE);
+-        DigestUtils digestUtils(HASH_SHA256);
+-        std::string tmpByteStr(tmpByte.begin(), tmpByte.end());
+-        digestUtils.AddData(tmpByteStr);
+-        std::string result = digestUtils.Result(DigestUtils::Type::BINARY);
+-        std::vector<int8_t> hashEle;
+-        for (int i = 0; i < result.size(); i++) {
+-            hashEle.push_back(result[i]);
++        std::shared_ptr<ByteBuffer> bufferPtr(buffer);
++        int bufferSize = bufferPtr->GetCapacity();
++        int index = readChunkIndex;
++        while (offset < bufferSize) {
++            ByteBuffer* chunk = Slice(bufferPtr.get(), offset, offset + CHUNK_SIZE);
++            std::vector<int8_t> tmpByte(CHUNK_SIZE);
++            chunk->GetData(offset + bufStartIdx, tmpByte.data(), CHUNK_SIZE);
++            DigestUtils digestUtils(HASH_SHA256);
++            std::string tmpByteStr(tmpByte.begin(), tmpByte.end());
++            digestUtils.AddData(tmpByteStr);
++            std::string result = digestUtils.Result(DigestUtils::Type::BINARY);
++            std::vector<int8_t> hashEle;
++            for (int i = 0; i < result.size(); i++) {
++                hashEle.push_back(result[i]);
++            }
++            hashes[index++] = hashEle;
++            offset += CHUNK_SIZE;
++            delete chunk;
++            processed++;
++            if ((processed & 0xFF) == 0) {
++                SIGNTRACE("[MARK] mth: task chunk=%d progress=%d/%d\n",
++                          readChunkIndex, offset, bufferSize);
++            }
+         }
+-        hashes[index++] = hashEle;
+-        offset += CHUNK_SIZE;
+-        delete chunk;
++        SIGNTRACE("[MARK] mth: task done chunk=%d processed=%d\n", readChunkIndex, processed);
++    } catch (const std::exception& e) {
++        SIGNTRACE("[MARK] mth: task EXCEPT chunk=%d processed=%d what=%s\n",
++                  readChunkIndex, processed, e.what());
++        throw;
++    } catch (...) {
++        SIGNTRACE("[MARK] mth: task EXCEPT chunk=%d processed=%d unknown\n",
++                  readChunkIndex, processed);
++        throw;
+     }
+ }
+ 
+@@ -188,7 +253,7 @@
+     }
+ }
+ 
+-OHOS::SignatureTools::MerkleTreeBuilder::MerkleTreeBuilder() :mPools(new Uscript::ThreadPool(POOL_SIZE))
++OHOS::SignatureTools::MerkleTreeBuilder::MerkleTreeBuilder() :mPools(GetSharedSignPool())
+ {
+     CheckCalculateHashResult = true;
+ }
+@@ -196,17 +261,29 @@
+ MerkleTree* MerkleTreeBuilder::GenerateMerkleTree(std::istream& inputStream, long size,
+                                                   const FsVerityHashAlgorithm& fsVerityHashAlgorithm)
+ {
++    SIGNTRACE("[MARK] mt: enter GenerateMerkleTree size=%ld\n", size);
+     SetAlgorithm(fsVerityHashAlgorithm.GetHashAlgorithm());
+     int digestSize = fsVerityHashAlgorithm.GetOutputByteSize();
+     std::vector<int64_t> offsetArrays = GetOffsetArrays(size, digestSize);
++    SIGNTRACE("[MARK] mt: after GetOffsetArrays digest=%d levels=%d total=%ld\n",
++              digestSize, (int)offsetArrays.size(),
++              offsetArrays.empty() ? -1L : (long)offsetArrays[offsetArrays.size() - 1]);
+     std::unique_ptr<ByteBuffer> allHashBuffer = std::make_unique<ByteBuffer>
+         (ByteBuffer(offsetArrays[offsetArrays.size() - 1]));
++    SIGNTRACE("[MARK] mt: before GenerateHashDataByInputData\n");
+     GenerateHashDataByInputData(inputStream, size, allHashBuffer.get(), offsetArrays, digestSize);
++    SIGNTRACE("[MARK] mt: after GenerateHashDataByInputData checkOk=%d\n", (int)CheckCalculateHashResult);
++    SIGNTRACE("[MARK] mt: before GenerateHashDataByHashData\n");
+     GenerateHashDataByHashData(allHashBuffer.get(), offsetArrays, digestSize);
++    SIGNTRACE("[MARK] mt: after GenerateHashDataByHashData checkOk=%d\n", (int)CheckCalculateHashResult);
+ 
+     if (CheckCalculateHashResult) {
+-        return GetMerkleTree(allHashBuffer.get(), size, fsVerityHashAlgorithm);
++        SIGNTRACE("[MARK] mt: before GetMerkleTree\n");
++        MerkleTree* tree = GetMerkleTree(allHashBuffer.get(), size, fsVerityHashAlgorithm);
++        SIGNTRACE("[MARK] mt: after GetMerkleTree tree=%p\n", (void*)tree);
++        return tree;
+     }
++    SIGNTRACE("[MARK] mt: CheckCalculateHashResult=false, return nullptr\n");
+     return nullptr;
+ }
+ 
+diff --git a/hapsigntool_cpp/codesigning/sign/include/code_signing.h b/hapsigntool_cpp/codesigning/sign/include/code_signing.h
+index a9aece4..5fd9144 100644
+--- a/hapsigntool_cpp/codesigning/sign/include/code_signing.h
++++ b/hapsigntool_cpp/codesigning/sign/include/code_signing.h
+@@ -22,6 +22,7 @@
+ 
+ #include "securec.h"
+ #include "thread_pool.h"
++#include "sign_thread_pool.h"
+ #include "hap_utils.h"
+ #include "zip_signer.h"
+ #include "file_utils.h"
+@@ -84,9 +85,7 @@
+                            UnzipHandleParam& param, int readFileSize);
+     bool DoNativeLibSignOrVerify(std::string fileName, std::stringbuf& sb,
+                                  UnzipHandleParam& param, int readFileSize);
+-    static constexpr int MAX_PROCESSORS = 32;
+-    const int POOL_SIZE = std::min(MAX_PROCESSORS, static_cast<int>(std::thread::hardware_concurrency()));
+-    std::shared_ptr<Uscript::ThreadPool> mPools;
++    std::shared_ptr<Uscript::ThreadPool> mPools; // 指向进程级 GetSharedSignPool()，见 sign_thread_pool.h
+ };
+ } // namespace SignatureTools
+ } // namespace OHOS
+diff --git a/hapsigntool_cpp/codesigning/sign/src/code_signing.cpp b/hapsigntool_cpp/codesigning/sign/src/code_signing.cpp
+index f3ca4ff..9465955 100644
+--- a/hapsigntool_cpp/codesigning/sign/src/code_signing.cpp
++++ b/hapsigntool_cpp/codesigning/sign/src/code_signing.cpp
+@@ -16,6 +16,8 @@
+ #include <algorithm>
+ 
+ #include "elf_sign_block.h"
++
++#include "../../trace_log.h"
+ #include "fs_verity_descriptor.h"
+ #include "fs_verity_descriptor_with_sign.h"
+ #include "verify_code_signature.h"
+@@ -34,12 +36,12 @@
+ const FsVerityHashAlgorithm FS_SHA512(2, "SHA-512", 512 / 8);
+ const int8_t LOG_2_OF_FSVERITY_HASH_PAGE_SIZE = 12;
+ 
+-CodeSigning::CodeSigning(SignerConfig* signConfig) : mPools(new Uscript::ThreadPool(POOL_SIZE))
++CodeSigning::CodeSigning(SignerConfig* signConfig) : mPools(GetSharedSignPool())
+ {
+     m_signConfig = signConfig;
+ }
+ 
+-CodeSigning::CodeSigning() : mPools(new Uscript::ThreadPool(POOL_SIZE))
++CodeSigning::CodeSigning() : mPools(GetSharedSignPool())
+ {
+ }
+ 
+@@ -47,13 +49,16 @@
+                                    const std::string &inForm, const std::string &profileContent,
+                                    ZipSigner& zip, std::vector<int8_t>& ret)
+ {
++    SIGNTRACE("[MARK] cs: enter GetCodeSignBlock\n");
+     SIGNATURE_TOOLS_LOGI("Start to sign code.");
+     bool flag = std::find(SUPPORT_FILE_FORM.begin(), SUPPORT_FILE_FORM.end(), inForm) == SUPPORT_FILE_FORM.end();
+     if (flag) {
+         SIGNATURE_TOOLS_LOGE("only support format is [hap, hqf, hsp, app]");
+         return false;
+     }
++    SIGNTRACE("[MARK] cs: before ComputeDataSize\n");
+     int64_t dataSize = ComputeDataSize(zip);
++    SIGNTRACE("[MARK] cs: after ComputeDataSize\n");
+     if (dataSize < 0) {
+         SIGNATURE_TOOLS_LOGE("SignFile Failed because dataSize is invalid");
+         return false;
+@@ -75,8 +80,10 @@
+         return false;
+     }
+     std::pair<SignInfo, std::vector<int8_t>> hapSignInfoAndMerkleTreeBytesPair;
++    SIGNTRACE("[MARK] cs: before SignFile\n");
+     bool signFileFlag = SignFile(inputStream, dataSize, true, fsvTreeOffset, ownerID,
+                                  hapSignInfoAndMerkleTreeBytesPair);
++    SIGNTRACE("[MARK] cs: after SignFile\n");
+     if (!signFileFlag) {
+         SIGNATURE_TOOLS_LOGE("SignFile Failed");
+         inputStream.close();
+@@ -86,12 +93,16 @@
+     m_codeSignBlock.GetHapInfoSegment().SetSignInfo(hapSignInfoAndMerkleTreeBytesPair.first);
+     m_codeSignBlock.AddOneMerkleTree(HAP_SIGNATURE_ENTRY_NAME,
+                                      hapSignInfoAndMerkleTreeBytesPair.second);
++    SIGNTRACE("[MARK] cs: before SignNativeLibs\n");
+     if (!SignNativeLibs(input, ownerID)) {
+         PrintErrorNumberMsg("SIGN_ERROR", SIGN_ERROR, "Failed to sign the contents in the compressed file.");
+         return false;
+     }
++    SIGNTRACE("[MARK] cs: before UpdateCodeSignBlock\n");
+     UpdateCodeSignBlock();
++    SIGNTRACE("[MARK] cs: before GenerateCodeSignBlockByte\n");
+     m_codeSignBlock.GenerateCodeSignBlockByte(fsvTreeOffset, ret);
++    SIGNTRACE("[MARK] cs: done\n");
+     SIGNATURE_TOOLS_LOGI("Sign successfully.");
+     return true;
+ }
+@@ -359,7 +370,9 @@
+ bool CodeSigning::HandleZipGlobalInfo(const std::string& packageName, unzFile& zFile,
+                                       unz_global_info& zGlobalInfo, UnzipHandleParam& param)
+ {
+-    std::vector<std::future<bool>> thread_results;
++    // 串行签名各 so：避免"外层 mPools × 每个 MerkleTreeBuilder 内层池(各 14 线程)"叠加，
++    // 在手机沙箱触发线程/mmap 资源上限 → 进程整体 abort
++    bool result = true;
+     SIGNATURE_TOOLS_LOGI("zGlobalInfo.number_entry = %lu", zGlobalInfo.number_entry);
+ 
+     for (uLong i = 0; i < zGlobalInfo.number_entry; ++i) {
+@@ -379,8 +392,9 @@
+                 SIGNATURE_TOOLS_LOGE("unzGetFilePos failed, fileName = %s", fileName);
+                 return false;
+             }
+-            thread_results.push_back(mPools->Enqueue(&CodeSigning::RunParseZipInfo, this,
+-                std::ref(packageName), std::ref(param), pos));
++            if (!RunParseZipInfo(packageName, param, pos)) {
++                result = false;
++            }
+         }
+         if (i != zGlobalInfo.number_entry - 1) {
+             int ret = unzGoToNextFile(zFile);
+@@ -391,11 +405,6 @@
+         }
+     }
+ 
+-    bool result = true;
+-    for (auto& thread_result : thread_results) {
+-        if (!thread_result.get())
+-            result = false;
+-    }
+     if (!result) {
+         return false;
+     }
+diff --git a/hapsigntool_cpp/codesigning/trace_log.h b/hapsigntool_cpp/codesigning/trace_log.h
+new file mode 100644
+index e69de29..16d8ec9 100644
+--- /dev/null
++++ b/hapsigntool_cpp/codesigning/trace_log.h
+@@ -0,0 +1,17 @@
++#ifndef SIGNATURETOOLS_TRACE_LOG_H
++#define SIGNATURETOOLS_TRACE_LOG_H
++
++#include <cstdio>
++
++// 签名器诊断输出使用独立文件句柄，避免与 hdc 内核争抢全局 stdout（freopen 竞态）
++extern FILE* g_signTrace;
++
++#define SIGNTRACE(...)                                            \
++    do {                                                          \
++        if (g_signTrace != nullptr) {                             \
++            fprintf(g_signTrace, __VA_ARGS__);                    \
++            fflush(g_signTrace);                                  \
++        }                                                         \
++    } while (0)
++
++#endif
 diff --git a/hapsigntool_cpp/common/include/signature_tools_log.h b/hapsigntool_cpp/common/include/signature_tools_log.h
 index 7bfcc63..f1c8453 100644
 --- a/hapsigntool_cpp/common/include/signature_tools_log.h
 +++ b/hapsigntool_cpp/common/include/signature_tools_log.h
-@@ -21,6 +21,8 @@
+@@ -21,7 +21,9 @@
  #include <ctime>
  #include <iomanip>
  #include <sstream>
 +#include <fstream>
-+
  
++
  #include "signature_tools_errno.h"
  
-@@ -32,6 +34,8 @@ static const char PLACEHOLDER = '0';
+ namespace OHOS {
+@@ -32,6 +34,8 @@
  static const int PLACEHOLDERLEN = 3;
  static const int SCALE = 1000;
  
@@ -32,7 +469,7 @@ index 7bfcc63..f1c8453 100644
  #define SIGNATURE_LOG(level, fmt, ...) \
      printf("[%s] [%s] [%s] [%d] " fmt "\n", level, __FILE_NAME__, __FUNCTION__, __LINE__, ##__VA_ARGS__) \
  
-@@ -71,8 +75,13 @@ inline std::string GetSystemTime()
+@@ -71,8 +75,13 @@
  **/
  inline void PrintErrorNumberMsg(const std::string& command, const int code, const std::string& details)
  {
@@ -46,7 +483,7 @@ index 7bfcc63..f1c8453 100644
  }
  
  /*
-@@ -82,7 +91,11 @@ inline void PrintErrorNumberMsg(const std::string& command, const int code, cons
+@@ -82,7 +91,11 @@
  **/
  inline void PrintMsg(const std::string& message)
  {

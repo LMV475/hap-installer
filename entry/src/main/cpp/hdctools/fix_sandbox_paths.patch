@@ -1,0 +1,41 @@
+diff --git a/src/common/base.cpp b/src/common/base.cpp
+index 686feb0..5b74205 100644
+--- a/src/common/base.cpp
++++ b/src/common/base.cpp
+@@ -70,6 +70,11 @@ namespace Base {
+         g_logLevel = logLevel;
+     }
+ 
++    void SetTempDir(string tempDir)
++    {
++        g_tempDir = tempDir;
++    }
++
+     uint8_t GetLogLevelByEnv()
+     {
+         char *env = getenv(ENV_SERVER_LOG.c_str());
+diff --git a/src/common/base.h b/src/common/base.h
+index 920dfbb..4d210da 100644
+--- a/src/common/base.h
++++ b/src/common/base.h
+@@ -55,6 +55,7 @@ namespace Base {
+     bool IsFileSizeLessThan(const std::string& fileName, const size_t fileMaxSize);
+ #endif
+     void SetLogLevel(const uint8_t logLevel);
++    void SetTempDir(string tempDir);
+     uint8_t GetLogLevelByEnv();
+     void PrintMessage(const char *fmt, ...);
+     void PrintMessageAndWriteLog(const char *fmt, ...);
+diff --git a/src/common/define.h b/src/common/define.h
+index 1ab9c64..b1494b6 100644
+--- a/src/common/define.h
++++ b/src/common/define.h
+@@ -45,7 +45,7 @@ const string ENV_ENCRYPT_CHANNEL = "OHOS_HDC_ENCRYPT_CHANNEL"; // 1: turn on enc
+ const string STR_PSK_IDENTITY = "Client_identity";
+ const string TLS_AES_128_GCM_SHA256 = "TLS_AES_128_GCM_SHA256";
+ #ifdef __OHOS__
+-const string UDS_PATH = "/data/hdc/hdc_debug/hdc_server";
++const string UDS_PATH = "/data/storage/el2/base/haps/entry/temp/hdc_server";
+ const string UDS_STR = "uds";
+ #endif
+ 
