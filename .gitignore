@@ -42,6 +42,10 @@ entry/src/main/cpp/hdctools/third_party/
 # openssl 预编译库（多平台静态库，体积大）
 entry/src/main/cpp/third_party/openssl/
 
+# ===== 未开源模块（涉及第三方内部接口，勿提交） =====
+# AgcService 逆向了华为 DevEco/AGC 内部接口，未获公开授权，仅本地保留
+entry/src/main/ets/common/AgcService.ets
+
 # ===== 签名密钥 / 证书（敏感，勿提交） =====
 # 仅排除根目录的 build-profile.json5（含签名密码）；entry/build-profile.json5 不含敏感信息，正常跟踪
 /build-profile.json5
