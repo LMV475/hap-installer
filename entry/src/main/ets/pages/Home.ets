@@ -20,7 +20,7 @@ import { HapPeek } from '../common/HapPeek';
 import { topInsetVp, bottomInsetVp } from '../common/Immersive';
 import { worker, MessageEvents, ErrorEvent, util } from '@kit.ArkTS';
 
-const SELF_BUNDLE: string = 'com.dsh.probe.hapinstaller';
+const SELF_BUNDLE: string = 'cn.lxh.hapinstaller';
 
 @Component
 export struct Home {
@@ -679,7 +679,7 @@ export struct Home {
       this.log('请先读取 UDID');
       return;
     }
-    const pkg: string = this.packageName.trim().length > 0 ? this.packageName.trim() : 'com.dsh.probe.hapinstaller';
+    const pkg: string = this.packageName.trim().length > 0 ? this.packageName.trim() : 'cn.lxh.hapinstaller';
     this.busy = true;
     this.status = '申请 Profile 中…';
     try {
