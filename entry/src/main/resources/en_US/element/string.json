@@ -1,0 +1,32 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "HarmonyOS debug & install toolkit"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "main entry"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "HAPKit"
+    },
+    {
+      "name": "EntryFormAbility_desc",
+      "value": "form_description"
+    },
+    {
+      "name": "EntryFormAbility_label",
+      "value": "form_label"
+    },
+    {
+      "name": "widget_desc",
+      "value": "This is a service widget."
+    },
+    {
+      "name": "widget_display_name",
+      "value": "widget"
+    }
+  ]
+}

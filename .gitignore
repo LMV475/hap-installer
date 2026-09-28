@@ -10,10 +10,17 @@ build/
 .idea/
 .hvigor/
 graphflow-out/
+.graphflow/
 .cxx/
+
+# ===== 代码生成产物 =====
+entry/src/main/cpp/hdctools/gen/
 
 # ===== 本机配置（每人不同） =====
 local.properties
+
+# 重复的应用级配置（根 AppScope 已跟踪，entry/src/AppScope 是冗余副本）
+entry/src/AppScope/
 
 # ===== 调试日志 / 截图 =====
 *.hilog

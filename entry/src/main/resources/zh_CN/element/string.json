@@ -1,0 +1,32 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "鸿蒙调试与安装工具箱"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "主入口"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "HAPKit"
+    },
+    {
+      "name": "EntryFormAbility_desc",
+      "value": "form_description"
+    },
+    {
+      "name": "EntryFormAbility_label",
+      "value": "form_label"
+    },
+    {
+      "name": "widget_desc",
+      "value": "This is a service widget."
+    },
+    {
+      "name": "widget_display_name",
+      "value": "widget"
+    }
+  ]
+}
