@@ -1,9 +1,7 @@
 import { webview } from '@kit.ArkWeb';
 import { safeAreaInsets } from '../common/Immersive';
 
-const GUIDE_URL: string = 'https://gitee.com/xiaobai-studio/XiaoBaiGuide/blob/master/README.md';
-
-/** 使用教程页（对应 Flutter user_guide_page.dart：WebView 嵌入在线教程） */
+/** 使用教程页（本地 rawfile WebView，与免责声明同结构，不跳转外部网页） */
 @Component
 export struct UserGuide {
   @Consume('navStack') pathStack: NavPathStack;
@@ -13,12 +11,10 @@ export struct UserGuide {
 
   build() {
     NavDestination() {
-      Web({ src: GUIDE_URL, controller: this.controller })
+      Web({ src: $rawfile('user_guide.html'), controller: this.controller })
         .domStorageAccess(true)
         .javaScriptAccess(true)
         .imageAccess(true)
-        .onlineImageAccess(true)
-        .mixedMode(MixedMode.All)
         .width('100%')
         .height('100%')
     }

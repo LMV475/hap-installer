@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>使用教程</title>
+<style>
+  * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+  body { font-family: -apple-system, "HarmonyOS Sans SC", sans-serif; margin: 0; padding: 16px; line-height: 1.8; color: #191919; background: #F1F3F5; }
+  .card { background: #FFFFFF; border-radius: 16px; padding: 20px 18px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  h1 { font-size: 22px; text-align: center; margin: 8px 0 6px; }
+  .subtitle { text-align: center; font-size: 13px; color: #888; margin-bottom: 18px; }
+  h2 { font-size: 17px; margin: 0 0 12px; display: flex; align-items: center; }
+  .step-num { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; background: #0A59F7; color: #fff; font-size: 14px; font-weight: 600; margin-right: 10px; flex-shrink: 0; }
+  p { font-size: 14px; margin: 8px 0; color: #333; }
+  .tip { font-size: 13px; color: #666; background: #F1F3F5; border-radius: 8px; padding: 10px 12px; margin: 10px 0 0; }
+  .tip strong { color: #0A59F7; }
+  ol, ul { padding-left: 20px; margin: 8px 0; }
+  li { font-size: 14px; margin-bottom: 6px; color: #333; }
+  .btn-demo { display: inline-block; background: #0A59F7; color: #fff; font-size: 13px; padding: 6px 14px; border-radius: 20px; margin: 4px 0; }
+  .divider { height: 1px; background: #F0F0F0; margin: 14px 0; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #000; color: #e6e6e6; }
+    .card { background: #1C1C1C; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+    h2 { color: #e6e6e6; }
+    p, li { color: #ccc; }
+    .tip { background: #2C2C2C; color: #aaa; }
+    .tip strong { color: #4D8BFF; }
+    .btn-demo { background: #4D8BFF; }
+    .divider { background: #2C2C2C; }
+    .subtitle { color: #888; }
+  }
+</style>
+</head>
+<body>
+
+<h1>使用教程</h1>
+<p class="subtitle">从登录到安装，四步完成 HAP 调试装机</p>
+
+<!-- 第一步：登录华为账号 -->
+<div class="card">
+  <h2><span class="step-num">1</span>登录华为账号</h2>
+  <p>在首页顶部找到「华为账号」卡片，点击右侧的<strong>「登录账号」</strong>按钮。</p>
+  <div class="btn-demo">登录账号</div>
+  <p>系统会自动打开浏览器，跳转到华为开发者授权页面。请在浏览器中完成登录与授权操作。</p>
+  <div class="tip">
+    <strong>提示：</strong>登录采用 DevEco IDE 授权通道，授权完成后会自动回调本应用，无需手动复制。若长时间未回调，请检查浏览器是否正常打开，或重试一次。
+  </div>
+  <div class="divider"></div>
+  <p>登录成功后，首页顶部会显示您的 <strong>uid</strong>，按钮文字变为<strong>「更换账号」</strong>。如需切换账号，再次点击即可重新走浏览器授权流程。</p>
+</div>
+
+<!-- 第二步：连接无线调试 -->
+<div class="card">
+  <h2><span class="step-num">2</span>连接无线调试</h2>
+  <p>登录成功后，「设备」卡片会自动出现。点击右侧的<strong>「无线调试」</strong>按钮，打开连接抽屉。</p>
+  <div class="btn-demo">无线调试</div>
+
+  <h2 style="margin-top:18px;"><span class="step-num" style="background:#999;">2.1</span>在手机上开启无线调试</h2>
+  <ol>
+    <li>进入手机「设置 → 系统 → 开发者选项」</li>
+    <li>打开「无线调试」开关</li>
+    <li>点击「无线调试」进入详情页，查看底部的 <strong>IP 地址与端口</strong>（形如 <code>192.168.1.100:5555</code>）</li>
+  </ol>
+
+  <h2 style="margin-top:18px;"><span class="step-num" style="background:#999;">2.2</span>在本应用中连接</h2>
+  <p>在弹出的连接抽屉中，分别填入手机上显示的 IP 和端口：</p>
+  <ul>
+    <li><strong>IP 地址：</strong>例如 <code>192.168.1.100</code></li>
+    <li><strong>端 口：</strong>例如 <code>5555</code></li>
+  </ul>
+  <p>点击<strong>「连接」</strong>，等待状态栏显示「已连接」。</p>
+  <div class="tip">
+    <strong>提示：</strong>手机与电脑需在同一局域网。若连接失败，请确认手机无线调试已开启、IP 与端口正确、防火墙未拦截。可在「更多 → 自动无线调试端口」开启自动重连。
+  </div>
+</div>
+
+<!-- 第三步：选择安装包 -->
+<div class="card">
+  <h2><span class="step-num">3</span>选择安装包</h2>
+  <p>连接成功后，「软件安装包」卡片会自动出现。点击右侧的<strong>「选择」</strong>按钮。</p>
+  <div class="btn-demo">选择</div>
+  <p>在文件选择器中找到您的 <strong>.hap</strong> / <strong>.hsp</strong> / <strong>.app</strong> 安装包文件并确认。</p>
+  <div class="tip">
+    <strong>提示：</strong>也可以在输入框中粘贴下载地址（<code>http://.../app.hap</code>），点击「下载」自动获取安装包。选包后会自动识别 bundle 名称与大小。
+  </div>
+  <div class="divider"></div>
+  <p>选中后，卡片会显示包名与文件大小，按钮文字变为<strong>「更换」</strong>。如需更换安装包，再次点击即可重新选择。</p>
+</div>
+
+<!-- 第四步：调试安装 / 已签名安装 -->
+<div class="card">
+  <h2><span class="step-num">4</span>调试安装 / 已签名安装</h2>
+  <p>前三步完成后，页面底部会出现两个安装按钮：</p>
+
+  <h2 style="margin-top:18px;"><span class="step-num" style="background:#34C759;">4a</span>开始调试（自动签名）</h2>
+  <div class="btn-demo" style="background:#0A59F7;">开始调试（自动签名）</div>
+  <p>点击此按钮，应用会自动完成<strong>签名</strong>并<strong>安装</strong>到设备。适合需要调试的未签名 HAP 包。</p>
+  <ul>
+    <li>自动使用内置签名材料（证书 / 密钥库 / Profile）</li>
+    <li>签名完成后立即推送安装，无需手动操作</li>
+    <li>若 Profile 绑定的包名与目标包不一致，会自动切换或申请对应的调试 Profile</li>
+  </ul>
+  <div class="tip">
+    <strong>提示：</strong>自动签名使用内置签名材料，开箱即用，无需额外配置。
+  </div>
+
+  <div class="divider"></div>
+
+  <h2 style="margin-top:18px;"><span class="step-num" style="background:#FF9500;">4b</span>直接安装（需已签名）</h2>
+  <div class="btn-demo" style="background:#999;">直接安装（需已签名）</div>
+  <p>点击此按钮，应用会<strong>跳过签名步骤</strong>，直接将已签名的 HAP 安装到设备。适合已有有效签名的安装包。</p>
+  <ul>
+    <li>安装包必须已通过华为 CA 链签名，否则系统会拒绝安装</li>
+    <li>若安装本应用自身（HapInstaller），安装后会自动重启</li>
+    <li>覆盖安装时会弹出确认弹窗，点击「继续安装」即可</li>
+  </ul>
+  <div class="tip">
+    <strong>提示：</strong>安装失败时请检查日志中的提示信息。常见原因：设备未连接、HAP 未签名、Profile 的 bundle-name 或 UDID 与目标包不匹配。
+  </div>
+</div>
+
+<div class="card" style="text-align:center;">
+  <p style="font-size:13px; color:#999;">如需查看更多功能，请前往「更多」页面</p>
+  <p style="font-size:12px; color:#bbb; margin-top:4px;">HapInstaller · 端侧签名装机工具</p>
+</div>
+
+</body>
+</html>
