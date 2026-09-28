@@ -1,0 +1,71 @@
+name: Release
+
+# 发布 HapInstaller 的 GitHub Release（含 HAP 产物）。
+#
+# 触发方式：
+#   1) 推送 release-assets 分支 —— 该分支存放待发布的 HAP 与 Release 正文；
+#   2) Actions 页面手动 Run workflow。
+#
+# 为什么产物不在 main：HAP 约 19MB，属构建产物，不应污染主分支历史；
+# 因此单独用 release-assets 分支承载，由本 workflow 上传为 Release 资产。
+
+on:
+  push:
+    branches:
+      - release-assets
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: 创建或更新 Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 检查 GITHUB_TOKEN 写权限
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          perm="$(gh api "repos/${GITHUB_REPOSITORY}" --jq '.permissions.push // false' 2>/dev/null || echo false)"
+          if [ "${perm}" != "true" ]; then
+            echo "::error::GITHUB_TOKEN 没有写权限。请到 Settings → Actions → General → Workflow permissions 选择 “Read and write permissions” 后重新运行本 workflow。"
+            exit 1
+          fi
+
+      - name: 读取版本并校验产物
+        run: |
+          set -euo pipefail
+          tag="$(tr -d '[:space:]' < VERSION)"
+          echo "RELEASE_TAG=${tag}" >> "$GITHUB_ENV"
+          echo "发布标签：${tag}"
+          ls -l
+          sha256sum -c SHA256SUMS.txt
+
+      - name: 确认远端标签已存在
+        run: |
+          set -euo pipefail
+          if ! git ls-remote --exit-code --tags origin "refs/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
+            echo "::error::远端标签 ${RELEASE_TAG} 不存在；请先在源码仓库打完标签并推送。"
+            exit 1
+          fi
+
+      - name: 创建或更新 Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          assets=( *.hap SHA256SUMS.txt )
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            gh release edit "${RELEASE_TAG}" --title "HapInstaller ${RELEASE_TAG}" --notes-file RELEASE_NOTES.md
+            gh release upload "${RELEASE_TAG}" --clobber "${assets[@]}"
+          else
+            gh release create "${RELEASE_TAG}" --title "HapInstaller ${RELEASE_TAG}" --notes-file RELEASE_NOTES.md "${assets[@]}"
+          fi
+          gh release view "${RELEASE_TAG}" --json tagName,isDraft,url,assets --jq '"release: \(.tagName) draft=\(.isDraft) url=\(.url)", (.assets[].name)'

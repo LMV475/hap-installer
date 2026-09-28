@@ -1,0 +1,1 @@
+bd20b09ae6cc503e2953e1e2e6ccc9e60f8de1d7b4e863ef78cb9820973c3dd5  HapInstaller-1.0.0-unsigned.hap
