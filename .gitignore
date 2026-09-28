@@ -43,8 +43,10 @@ entry/src/main/cpp/hdctools/third_party/
 entry/src/main/cpp/third_party/openssl/
 
 # ===== 未开源模块（涉及第三方内部接口，勿提交） =====
-# AgcService 逆向了华为 DevEco/AGC 内部接口，未获公开授权，仅本地保留
-entry/src/main/ets/common/AgcService.ets
+# AgcService 逆向了华为 DevEco/AGC 内部接口，未获公开授权，仅本地保留。
+# 仓库中入库的是不含实现的功能空壳（stub），接口签名与业务代码一致，保证 clone 后可编译；
+# 本地真实实现另存为 AgcService.local.ets，用 tools/enable-agc.sh 覆盖启用。
+entry/src/main/ets/common/AgcService.local.ets
 
 # ===== 签名密钥 / 证书（敏感，勿提交） =====
 # 仅排除根目录的 build-profile.json5（含签名密码）；entry/build-profile.json5 不含敏感信息，正常跟踪
