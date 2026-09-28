@@ -28,17 +28,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: 检查 GITHUB_TOKEN 写权限
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          perm="$(gh api "repos/${GITHUB_REPOSITORY}" --jq '.permissions.push // false' 2>/dev/null || echo false)"
-          if [ "${perm}" != "true" ]; then
-            echo "::error::GITHUB_TOKEN 没有写权限。请到 Settings → Actions → General → Workflow permissions 选择 “Read and write permissions” 后重新运行本 workflow。"
-            exit 1
-          fi
-
       - name: 读取版本并校验产物
         run: |
           set -euo pipefail
@@ -52,7 +41,7 @@ jobs:
         run: |
           set -euo pipefail
           if ! git ls-remote --exit-code --tags origin "refs/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
-            echo "::error::远端标签 ${RELEASE_TAG} 不存在；请先在源码仓库打完标签并推送。"
+            echo "远端标签 ${RELEASE_TAG} 不存在；请先在源码仓库打标签并推送。"
             exit 1
           fi
 
@@ -61,11 +50,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          assets=( *.hap SHA256SUMS.txt )
           if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
             gh release edit "${RELEASE_TAG}" --title "HapInstaller ${RELEASE_TAG}" --notes-file RELEASE_NOTES.md
-            gh release upload "${RELEASE_TAG}" --clobber "${assets[@]}"
+            gh release upload "${RELEASE_TAG}" --clobber *.hap SHA256SUMS.txt
           else
-            gh release create "${RELEASE_TAG}" --title "HapInstaller ${RELEASE_TAG}" --notes-file RELEASE_NOTES.md "${assets[@]}"
+            gh release create "${RELEASE_TAG}" --title "HapInstaller ${RELEASE_TAG}" --notes-file RELEASE_NOTES.md *.hap SHA256SUMS.txt
           fi
           gh release view "${RELEASE_TAG}" --json tagName,isDraft,url,assets --jq '"release: \(.tagName) draft=\(.isDraft) url=\(.url)", (.assets[].name)'
+
+      - name: 失败时给出排查提示
+        if: failure()
+        run: |
+          echo "::error::发布失败。若日志显示 403 / Resource not accessible by integration，请到 Settings → Actions → General → Workflow permissions 选择 “Read and write permissions”，然后在 Actions 页面点 Re-run all jobs。"
