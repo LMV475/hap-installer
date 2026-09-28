@@ -84,7 +84,7 @@ export struct More {
 
   private async loadThemePrefs(): Promise<void> {
     try {
-      const store = await preferences.getPreferences(this.ctx(), 'hapkit');
+      const store = await preferences.getPreferences(this.ctx(), 'hapinstaller');
       this.followSystemDark = await store.get('followSystemDark', true) as boolean;
       this.darkModeOn = await store.get('darkModeOn', false) as boolean;
       this.autoPortOn = await store.get('autoPortOn', false) as boolean;
@@ -93,7 +93,7 @@ export struct More {
   }
 
   private saveThemePrefs(): void {
-    preferences.getPreferences(this.ctx(), 'hapkit').then(async (store): Promise<void> => {
+    preferences.getPreferences(this.ctx(), 'hapinstaller').then(async (store): Promise<void> => {
       await store.put('followSystemDark', this.followSystemDark);
       await store.put('darkModeOn', this.darkModeOn);
       await store.put('autoPortOn', this.autoPortOn);
@@ -182,7 +182,7 @@ export struct More {
 
   private async doClear(signOnly: boolean): Promise<void> {
     try {
-      const store = await preferences.getPreferences(this.ctx(), 'hapkit');
+      const store = await preferences.getPreferences(this.ctx(), 'hapinstaller');
       if (signOnly) {
         await store.delete('cerPath');
         await store.delete('p7bPath');

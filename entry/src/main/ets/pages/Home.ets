@@ -20,7 +20,7 @@ import { HapPeek } from '../common/HapPeek';
 import { topInsetVp, bottomInsetVp } from '../common/Immersive';
 import { worker, MessageEvents, ErrorEvent, util } from '@kit.ArkTS';
 
-const SELF_BUNDLE: string = 'com.dsh.probe.hapkit';
+const SELF_BUNDLE: string = 'com.dsh.probe.hapinstaller';
 
 @Component
 export struct Home {
@@ -102,9 +102,9 @@ export struct Home {
     for (const p of parts) {
       if (p.length > 0) {
         this.logs = this.logs.concat(['[' + stamp + '] ' + p]);
-        hilog.info(0x0000, 'HAPKIT', '%{public}s', p);
+        hilog.info(0x0000, 'HapInstaller', '%{public}s', p);
         try {
-          const logPath: string = this.ctx().filesDir + '/hapkit.log';
+          const logPath: string = this.ctx().filesDir + '/hapinstaller.log';
           const lf = fileIo.openSync(logPath,
             fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE | fileIo.OpenMode.APPEND);
           fileIo.writeSync(lf.fd, '[' + stamp + '] ' + p + '\n');
@@ -159,10 +159,10 @@ export struct Home {
       await this.exportFile(this.ctx().tempDir + '/sign.out', '/data/local/tmp/sign.out');
       await this.exportFile(this.ctx().tempDir + '/sign_stdout.txt', '/data/local/tmp/sign_stdout.txt');
       await this.exportFile(this.ctx().tempDir + '/signed.hap', '/data/local/tmp/partial_signed.hap');
-      await this.exportFile(this.ctx().filesDir + '/hapkit-debug.cer', '/data/local/tmp/hapkit-debug.cer');
-      await this.exportFile(this.ctx().filesDir + '/hapkit-debug.p7b', '/data/local/tmp/hapkit-debug.p7b');
+      await this.exportFile(this.ctx().filesDir + '/hapinstaller-debug.cer', '/data/local/tmp/hapinstaller-debug.cer');
+      await this.exportFile(this.ctx().filesDir + '/hapinstaller-debug.p7b', '/data/local/tmp/hapinstaller-debug.p7b');
       await this.exportFile(this.ctx().filesDir + '/xiaobai.p12', '/data/local/tmp/xiaobai.p12');
-      await this.exportFile(this.ctx().filesDir + '/hapkit.log', '/data/local/tmp/hapkit.log');
+      await this.exportFile(this.ctx().filesDir + '/hapinstaller.log', '/data/local/tmp/hapinstaller.log');
     }
 
     const autoUdid: string | undefined = AppStorage.get<string>('autoUdid');
@@ -258,17 +258,17 @@ export struct Home {
       await this.exportFile(this.ctx().tempDir + '/sign.out', '/data/local/tmp/sign.out');
       await this.exportFile(this.ctx().tempDir + '/sign_stdout.txt', '/data/local/tmp/sign_stdout.txt');
       await this.exportFile(this.ctx().tempDir + '/signed.hap', '/data/local/tmp/signed.hap');
-      await this.exportFile(this.ctx().filesDir + '/hapkit-debug.cer', '/data/local/tmp/hapkit-debug.cer');
-      await this.exportFile(this.ctx().filesDir + '/hapkit-debug.p7b', '/data/local/tmp/hapkit-debug.p7b');
-      await this.exportFile(this.ctx().filesDir + '/hapkit.log', '/data/local/tmp/hapkit.log');
+      await this.exportFile(this.ctx().filesDir + '/hapinstaller-debug.cer', '/data/local/tmp/hapinstaller-debug.cer');
+      await this.exportFile(this.ctx().filesDir + '/hapinstaller-debug.p7b', '/data/local/tmp/hapinstaller-debug.p7b');
+      await this.exportFile(this.ctx().filesDir + '/hapinstaller.log', '/data/local/tmp/hapinstaller.log');
     }
     this.log('[step] 自动流程结束');
-    await this.exportFile(this.ctx().filesDir + '/hapkit.log', '/data/local/tmp/hapkit.log');
+    await this.exportFile(this.ctx().filesDir + '/hapinstaller.log', '/data/local/tmp/hapinstaller.log');
     const autoInstall: string | undefined = AppStorage.get<string>('autoInstall');
     if (autoInstall !== undefined && autoInstall === '1' && this.signedPath.length > 0) {
       // T2 回归：走 App 内 HdcService 的 install 通道；同 bundle 替换会 kill 本进程，最后几行日志可能丢，属预期
       this.log('[auto] 即将自装: ' + this.signedPath);
-      await this.exportFile(this.ctx().filesDir + '/hapkit.log', '/data/local/tmp/hapkit-preinstall.log');
+      await this.exportFile(this.ctx().filesDir + '/hapinstaller.log', '/data/local/tmp/hapinstaller-preinstall.log');
       await this.doInstall();
     }
   }
@@ -385,7 +385,7 @@ export struct Home {
 
   private async saveConfig(): Promise<void> {
     try {
-      const store = await preferences.getPreferences(this.ctx(), 'hapkit');
+      const store = await preferences.getPreferences(this.ctx(), 'hapinstaller');
       await store.put('target', this.target);
       if (this.hapPath.length > 0 && fileIo.accessSync(this.hapPath)) {
         await store.put('hapPath', this.hapPath);
@@ -413,7 +413,7 @@ export struct Home {
 
   private async loadConfig(): Promise<void> {
     try {
-      const store = await preferences.getPreferences(this.ctx(), 'hapkit');
+      const store = await preferences.getPreferences(this.ctx(), 'hapinstaller');
       const target: string = await store.get('target', this.target) as string;
       const cachedHap: string = await store.get('hapPath', '') as string;
       const cer: string = await store.get('cerPath', '') as string;
@@ -488,7 +488,7 @@ export struct Home {
       }
     }
     if (this.cerPath.length === 0 || !fileIo.accessSync(this.cerPath)) {
-      const fresh: string = f + '/hapkit-debug.cer';
+      const fresh: string = f + '/hapinstaller-debug.cer';
       const builtin: string = f + '/xiaobai-debug.cer';
       if (!fileIo.accessSync(fresh) && !fileIo.accessSync(builtin)) {
         this.releaseBuiltin('xiaobai-debug.cer');
@@ -500,7 +500,7 @@ export struct Home {
       }
     }
     if (this.p7bPath.length === 0 || !fileIo.accessSync(this.p7bPath)) {
-      const fresh: string = f + '/hapkit-debug.p7b';
+      const fresh: string = f + '/hapinstaller-debug.p7b';
       const builtin: string = f + '/xiaobai-debug.p7b';
       if (!fileIo.accessSync(fresh) && !fileIo.accessSync(builtin)) {
         this.releaseBuiltin('xiaobai-debug.p7b');
@@ -613,7 +613,7 @@ export struct Home {
       const certs: AgcCertInfo[] = await AgcService.getCertList();
       let target: AgcCertInfo | undefined = undefined;
       for (const c of certs) {
-        if (c.certName === 'hapkit-debug') {
+        if (c.certName === 'hapinstaller-debug') {
           target = c;
         }
       }
@@ -625,14 +625,14 @@ export struct Home {
       }
       if (target === undefined) {
         this.log('向 AGC 提交 CSR 申请证书…');
-        target = await AgcService.createCert('hapkit-debug', 1, csr);
+        target = await AgcService.createCert('hapinstaller-debug', 1, csr);
       } else {
         this.log('复用已有证书: ' + target.id);
       }
       const url: string = await AgcService.certDownloadUrl(target.certObjectId);
-      const cerPath: string = this.ctx().filesDir + '/hapkit-debug.cer';
-      await this.downloadTo(url, 'hapkit-debug.cer');
-      const tmpCer: string = this.ctx().tempDir + '/hapkit-debug.cer';
+      const cerPath: string = this.ctx().filesDir + '/hapinstaller-debug.cer';
+      await this.downloadTo(url, 'hapinstaller-debug.cer');
+      const tmpCer: string = this.ctx().tempDir + '/hapinstaller-debug.cer';
       if (fileIo.accessSync(tmpCer)) {
         fileIo.copyFileSync(tmpCer, cerPath);
         this.cerPath = cerPath;
@@ -679,7 +679,7 @@ export struct Home {
       this.log('请先读取 UDID');
       return;
     }
-    const pkg: string = this.packageName.trim().length > 0 ? this.packageName.trim() : 'com.dsh.probe.hapkit';
+    const pkg: string = this.packageName.trim().length > 0 ? this.packageName.trim() : 'com.dsh.probe.hapinstaller';
     this.busy = true;
     this.status = '申请 Profile 中…';
     try {
@@ -692,7 +692,7 @@ export struct Home {
       }
       if (!found) {
         this.log('注册设备 UDID 到 AGC…');
-        await AgcService.createDevice('hapkit-' + this.udid.substring(0, 10), this.udid);
+        await AgcService.createDevice('hapinstaller-' + this.udid.substring(0, 10), this.udid);
         devices = await AgcService.deviceList();
       }
       const ids: string[] = [];
@@ -702,7 +702,7 @@ export struct Home {
       const certs: AgcCertInfo[] = await AgcService.getCertList();
       let certId: string = '';
       for (const c of certs) {
-        if (c.certName === 'hapkit-debug') {
+        if (c.certName === 'hapinstaller-debug') {
           certId = c.id;
         }
       }
@@ -711,7 +711,7 @@ export struct Home {
         this.busy = false;
         return;
       }
-      const profileName: string = 'hapkit-debug_' + pkg.replace(/\./g, '_');
+      const profileName: string = 'hapinstaller-debug_' + pkg.replace(/\./g, '_');
       // 对齐 PC getAcl：只申请目标包真正声明、且落在 ACL 白名单内的受限权限
       const acl: string[] = await this.aclForTarget();
       this.log('申请 Profile: ' + profileName + '，ACL: ' + (acl.length > 0 ? acl.join('、') : '无'));
@@ -750,8 +750,8 @@ export struct Home {
         fileIo.closeSync(outFile);
         this.log('内置材料已释放: ' + name + ' (' + fileIo.statSync(target).size + ' B)');
       }
-      const freshCer: string = this.ctx().filesDir + '/hapkit-debug.cer';
-      const freshP7b: string = this.ctx().filesDir + '/hapkit-debug.p7b';
+      const freshCer: string = this.ctx().filesDir + '/hapinstaller-debug.cer';
+      const freshP7b: string = this.ctx().filesDir + '/hapinstaller-debug.p7b';
       this.p12Path = this.ctx().filesDir + '/xiaobai.p12';
       // 内置的是 2025-08 过期的起手包，若已有 AGC 新签发材料则优先使用
       this.cerPath = fileIo.accessSync(freshCer) ? freshCer : this.ctx().filesDir + '/xiaobai-debug.cer';
@@ -775,7 +775,7 @@ export struct Home {
       return;
     }
     this.busy = true;
-    const p12: string = this.ctx().filesDir + '/hapkit-key.p12';
+    const p12: string = this.ctx().filesDir + '/hapinstaller-key.p12';
     try {
       const cmd: string = 'signtool generate-keypair -keyAlias ' + this.keyAlias.trim() +
         ' -keyAlg ECC -keySize NIST-P-256 -keystoreFile ' + p12 +
@@ -832,7 +832,7 @@ export struct Home {
     }
     try {
       const options = new picker.DocumentSaveOptions();
-      options.newFileNames = ['hapkit.csr'];
+      options.newFileNames = ['hapinstaller.csr'];
       const documentPicker = new picker.DocumentViewPicker(this.ctx());
       const uris: string[] = await documentPicker.save(options);
       if (uris.length === 0) {
@@ -1213,7 +1213,7 @@ export struct Home {
     this.log('[bare] HdcService.isServerStarted()=' + HdcService.isServerStarted());
     await this.doSign();
     this.log('[bare] 签名流程返回，产物: ' + (this.signedPath.length > 0 ? this.signedPath : '未产出'));
-    this.log('[bare] 请把 filesDir/hapkit.log、filesDir/lifecycle.log、tempDir/sign.out、tempDir/sign_stdout.txt 从沙箱导出核对');
+    this.log('[bare] 请把 filesDir/hapinstaller.log、filesDir/lifecycle.log、tempDir/sign.out、tempDir/sign_stdout.txt 从沙箱导出核对');
   }
 
   private async exportFile(local: string, remote: string): Promise<void> {
@@ -1274,8 +1274,8 @@ export struct Home {
 
   /** 进程内 hdc 的 list targets 会残留已断开的会话，用一条真实命令探活 */
   private async probeLive(): Promise<boolean> {
-    const out: string = await this.execTimeout('shell echo hapkit-alive', 6000);
-    return out.indexOf('hapkit-alive') >= 0;
+    const out: string = await this.execTimeout('shell echo hapinstaller-alive', 6000);
+    return out.indexOf('hapinstaller-alive') >= 0;
   }
 
   /** 安装前置检查：确认进程内 hdc 有一条可用目标，必要时用保存的 target 重连 */
@@ -1359,7 +1359,7 @@ export struct Home {
     this.status = '正在安装…';
     const rowId: number = await Store.insertHistory(
       instBundle, this.target, target, isSelf ? 'killed_expected' : 'pending',
-      this.ctx().filesDir + '/hapkit.log');
+      this.ctx().filesDir + '/hapinstaller.log');
     try {
       const out: string = await this.exec('install -r ' + target);
       const success: boolean = out.indexOf('successfully') >= 0;

@@ -12,7 +12,7 @@ export class SignService {
   static sign(cmd: string, tempDir: string): Promise<SignOutcome> {
     return new Promise<SignOutcome>((resolve: (v: SignOutcome) => void) => {
       signtool.signHap(cmd, tempDir, (code: number, output: string): void => {
-        hilog.info(0x0000, 'HAPKIT', '%{public}s', 'signHap returned ' + code);
+        hilog.info(0x0000, 'HapInstaller', '%{public}s', 'signHap returned ' + code);
         const text: string = (output === undefined || output === null) ? '' : output;
         resolve({ code: code, output: text });
       });

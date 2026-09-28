@@ -11,7 +11,7 @@ export class HdcService {
     }
     hdc.hdcStartServer(tempDir);
     HdcService.serverStarted = true;
-    hilog.info(0x0000, 'HAPKIT', '%{public}s', 'hdc server started, tempDir=' + tempDir);
+    hilog.info(0x0000, 'HapInstaller', '%{public}s', 'hdc server started, tempDir=' + tempDir);
   }
 
   static isServerStarted(): boolean {

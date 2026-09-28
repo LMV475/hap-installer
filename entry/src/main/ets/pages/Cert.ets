@@ -55,7 +55,7 @@ export struct Cert {
         this.certs = await AgcService.getCertList();
         this.tipText = '登录态已自动刷新';
       }
-      const store = await preferences.getPreferences(this.ctx(), 'hapkit');
+      const store = await preferences.getPreferences(this.ctx(), 'hapinstaller');
       const cerPath: string = await store.get('cerPath', '') as string;
       this.currentName = cerPath.length > 0 ? this.inferNameFromCerts(cerPath) : '';
     } catch (e) {
@@ -67,7 +67,7 @@ export struct Cert {
 
   private inferNameFromCerts(_cerPath: string): string {
     for (const c of this.certs) {
-      if (c.certName === 'hapkit-debug') {
+      if (c.certName === 'hapinstaller-debug') {
         return c.certName;
       }
     }
@@ -91,7 +91,7 @@ export struct Cert {
   private async useCert(c: AgcCertInfo): Promise<void> {
     try {
       const url: string = await AgcService.certDownloadUrl(c.certObjectId);
-      const dst: string = this.ctx().filesDir + '/hapkit-' + c.id + '.cer';
+      const dst: string = this.ctx().filesDir + '/hapinstaller-' + c.id + '.cer';
       try {
         fileIo.unlinkSync(dst);
       } catch (ignored) {
@@ -106,7 +106,7 @@ export struct Cert {
         this.tipText = '下载失败';
         return;
       }
-      const store = await preferences.getPreferences(this.ctx(), 'hapkit');
+      const store = await preferences.getPreferences(this.ctx(), 'hapinstaller');
       await store.put('cerPath', dst);
       await store.flush();
       this.currentName = c.certName;

@@ -33,7 +33,7 @@ export struct TeamDevice {
 
   private async loadCurrent(): Promise<void> {
     try {
-      const store = await preferences.getPreferences(this.ctx(), 'hapkit');
+      const store = await preferences.getPreferences(this.ctx(), 'hapinstaller');
       this.currentTarget = await store.get('target', '') as string;
     } catch (e) {
       // 保持空
@@ -64,7 +64,7 @@ export struct TeamDevice {
 
   private async setDefault(target: string): Promise<void> {
     try {
-      const store = await preferences.getPreferences(this.ctx(), 'hapkit');
+      const store = await preferences.getPreferences(this.ctx(), 'hapinstaller');
       await store.put('target', target);
       await store.flush();
       this.currentTarget = target;

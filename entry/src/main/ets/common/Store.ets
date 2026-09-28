@@ -24,7 +24,7 @@ export interface HistoryRow {
   logPath: string;
 }
 
-const DB_NAME: string = 'hapkit.db';
+const DB_NAME: string = 'hapinstaller.db';
 const SCHEMA: string =
   'CREATE TABLE IF NOT EXISTS debug_app (' +
   'bundle_name TEXT PRIMARY KEY, app_name TEXT, icon_path TEXT, install_time INTEGER, ' +
@@ -49,7 +49,7 @@ export class Store {
     Store.rdb = await relationalStore.getRdbStore(context, config);
     await Store.rdb.executeSql(SCHEMA);
     await Store.rdb.executeSql(SCHEMA_HIST);
-    hilog.info(0x0000, 'HAPKIT', '%{public}s', '[store] hapkit.db ready');
+    hilog.info(0x0000, 'HapInstaller', '%{public}s', '[store] hapinstaller.db ready');
   }
 
   static async insertHistory(bundleName: string, target: string, hapPath: string,
@@ -151,7 +151,7 @@ export class Store {
 
   /**
    * 冷启调用：把上次装机遗留的 killed_expected 行改判。
-   * 判定依据：hapkit.log 是否含 "install bundle successfully"。
+   * 判定依据：hapinstaller.log 是否含 "install bundle successfully"。
    */
   static async repairKilled(context: common.UIAbilityContext): Promise<number> {
     const rows: HistoryRow[] = await Store.pendingKilled();
@@ -160,15 +160,15 @@ export class Store {
     }
     let logText: string = '';
     try {
-      logText = fileIo.readTextSync(context.filesDir + '/hapkit.log');
+      logText = fileIo.readTextSync(context.filesDir + '/hapinstaller.log');
     } catch (ignored) {
     }
     const success: boolean = logText.indexOf('install bundle successfully') >= 0;
     for (const r of rows) {
       await Store.updateHistory(r.id, success ? 'success' : 'failed',
-        success ? '' : 'no success marker in hapkit.log');
+        success ? '' : 'no success marker in hapinstaller.log');
     }
-    hilog.info(0x0000, 'HAPKIT', '%{public}s',
+    hilog.info(0x0000, 'HapInstaller', '%{public}s',
       '[store] repaired ' + rows.length.toString() + ' killed_expected rows, ok=' + success);
     return rows.length;
   }

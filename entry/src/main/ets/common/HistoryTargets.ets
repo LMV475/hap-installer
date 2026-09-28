@@ -7,7 +7,7 @@ const MAX: number = 10;
 /** 无线调试历史连接地址列表（对应 Flutter EcoViewModel.historyList） */
 export async function loadHistoryTargets(ctx: common.UIAbilityContext): Promise<string[]> {
   try {
-    const store = await preferences.getPreferences(ctx, 'hapkit');
+    const store = await preferences.getPreferences(ctx, 'hapinstaller');
     const raw: string = await store.get(KEY, '') as string;
     if (raw.length === 0) {
       return [];
@@ -27,7 +27,7 @@ export async function addHistoryTarget(ctx: common.UIAbilityContext, addr: strin
     next.pop();
   }
   try {
-    const store = await preferences.getPreferences(ctx, 'hapkit');
+    const store = await preferences.getPreferences(ctx, 'hapinstaller');
     await store.put(KEY, JSON.stringify(next));
     await store.flush();
   } catch (e) {
@@ -37,7 +37,7 @@ export async function addHistoryTarget(ctx: common.UIAbilityContext, addr: strin
 
 export async function clearHistoryTargets(ctx: common.UIAbilityContext): Promise<void> {
   try {
-    const store = await preferences.getPreferences(ctx, 'hapkit');
+    const store = await preferences.getPreferences(ctx, 'hapinstaller');
     await store.delete(KEY);
     await store.flush();
   } catch (e) {

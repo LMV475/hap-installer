@@ -50,7 +50,7 @@ export struct DebugDetail {
   private loadLog(): void {
     const r: HistoryRow | undefined = this.row;
     const path: string = (r !== undefined && r.logPath.length > 0)
-      ? r.logPath : this.ctx().filesDir + '/hapkit.log';
+      ? r.logPath : this.ctx().filesDir + '/hapinstaller.log';
     let text: string = '';
     try {
       text = fileIo.readTextSync(path);

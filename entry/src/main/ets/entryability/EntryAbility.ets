@@ -31,15 +31,15 @@ export default class EntryAbility extends UIAbility {
         this.putString(params, 'autoInstall');
       }
     } catch (e) {
-      hilog.error(0x0000, 'HAPKIT', '%{public}s', 'read want params failed');
+      hilog.error(0x0000, 'HapInstaller', '%{public}s', 'read want params failed');
     }
     this.restoreTheme();
     this.appendLifecycle('start', 'launchReason=' + launchParam.launchReason);
   }
 
-  /** 浏览器授权页回跳（hapkit://）时被系统拉起：确保回到首页 */
+  /** 浏览器授权页回跳（hapinstaller://）时被系统拉起：确保回到首页 */
   onNewWant(want: Want, launchParam: AbilityConstant.LaunchParam): void {
-    hilog.info(0x0000, 'HAPKIT', '%{public}s', '[ability] onNewWant uri=' + (want.uri ?? ''));
+    hilog.info(0x0000, 'HapInstaller', '%{public}s', '[ability] onNewWant uri=' + (want.uri ?? ''));
     AppStorage.setOrCreate<number>('selectedTab', 0);
     this.appendLifecycle('foreground', 'reentry uri=' + (want.uri ?? ''));
   }
@@ -74,7 +74,7 @@ export default class EntryAbility extends UIAbility {
 
   /** 启动时恢复上次保存的深浅色设置，保证「跟随系统」在进 App 前就生效 */
   private restoreTheme(): void {
-    preferences.getPreferences(this.context, 'hapkit').then(async (store): Promise<void> => {
+    preferences.getPreferences(this.context, 'hapinstaller').then(async (store): Promise<void> => {
       const follow: boolean = await store.get('followSystemDark', true) as boolean;
       const dark: boolean = await store.get('darkModeOn', false) as boolean;
       AppStorage.setOrCreate<boolean>('followSystemDark', follow);
@@ -114,7 +114,7 @@ export default class EntryAbility extends UIAbility {
   onWindowStageCreate(windowStage: window.WindowStage): void {
     windowStage.loadContent('pages/Index', (err) => {
       if (err.code) {
-        hilog.error(0x0000, 'HAPKIT', 'loadContent failed: %{public}s', JSON.stringify(err));
+        hilog.error(0x0000, 'HapInstaller', 'loadContent failed: %{public}s', JSON.stringify(err));
       }
       this.setupImmersiveWindow(windowStage);
     });
@@ -142,7 +142,7 @@ export default class EntryAbility extends UIAbility {
         }
       });
     } catch (e) {
-      hilog.error(0x0000, 'HAPKIT', '%{public}s', 'immersive setup failed');
+      hilog.error(0x0000, 'HapInstaller', '%{public}s', 'immersive setup failed');
     }
   }
 

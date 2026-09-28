@@ -45,13 +45,13 @@ export struct CertWeb {
       return;
     }
     try {
-      const store = await preferences.getPreferences(this.ctx(), 'hapkit');
+      const store = await preferences.getPreferences(this.ctx(), 'hapinstaller');
       await store.put(key, target);
       await store.flush();
-      hilog.info(0x0000, 'HAPKIT', '%{public}s', '[web] 材料已写入配置 ' + key + '=' + target);
+      hilog.info(0x0000, 'HapInstaller', '%{public}s', '[web] 材料已写入配置 ' + key + '=' + target);
     } catch (e) {
       const err = e as BusinessError;
-      hilog.error(0x0000, 'HAPKIT', '[web] 写入配置失败 %{public}s', err.message);
+      hilog.error(0x0000, 'HapInstaller', '[web] 写入配置失败 %{public}s', err.message);
     }
   }
 
@@ -74,10 +74,10 @@ export struct CertWeb {
           item.start(target);
           AppStorage.setOrCreate<string>('lastDownload', target);
           this.downloads = '下载中: ' + name;
-          hilog.info(0x0000, 'HAPKIT', '%{public}s', '[web] 开始下载 ' + name + ' -> ' + target);
+          hilog.info(0x0000, 'HapInstaller', '%{public}s', '[web] 开始下载 ' + name + ' -> ' + target);
         } catch (e) {
           const err = e as BusinessError;
-          hilog.error(0x0000, 'HAPKIT', '[web] start 下载失败 %{public}s', err.message);
+          hilog.error(0x0000, 'HapInstaller', '[web] start 下载失败 %{public}s', err.message);
         }
       });
       delegate.onDownloadFinish((item: webview.WebDownloadItem): void => {
@@ -92,17 +92,17 @@ export struct CertWeb {
         AppStorage.setOrCreate<string>('lastDownload', target);
         this.persistMaterial(target);
         this.downloads = '已下载: ' + name + ' (' + size + ' bytes)';
-        hilog.info(0x0000, 'HAPKIT', '%{public}s', '[web] 下载完成 ' + target + ' size=' + size);
+        hilog.info(0x0000, 'HapInstaller', '%{public}s', '[web] 下载完成 ' + target + ' size=' + size);
       });
       delegate.onDownloadFailed((item: webview.WebDownloadItem): void => {
         this.downloads = '下载失败: ' + item.getSuggestedFileName();
-        hilog.error(0x0000, 'HAPKIT', '%{public}s', '[web] 下载失败 ' + item.getSuggestedFileName());
+        hilog.error(0x0000, 'HapInstaller', '%{public}s', '[web] 下载失败 ' + item.getSuggestedFileName());
       });
       this.controller.setDownloadDelegate(delegate);
-      hilog.info(0x0000, 'HAPKIT', '%{public}s', '[web] 下载代理已注册');
+      hilog.info(0x0000, 'HapInstaller', '%{public}s', '[web] 下载代理已注册');
     } catch (e) {
       const err = e as BusinessError;
-      hilog.error(0x0000, 'HAPKIT', '[web] 注册下载代理失败 %{public}s', err.message);
+      hilog.error(0x0000, 'HapInstaller', '[web] 注册下载代理失败 %{public}s', err.message);
     }
   }
 
@@ -151,7 +151,7 @@ export struct CertWeb {
         })
         .onPageBegin((event) => {
           if (event) {
-            hilog.info(0x0000, 'HAPKIT', '%{public}s', '[web] 开始加载 ' + event.url);
+            hilog.info(0x0000, 'HapInstaller', '%{public}s', '[web] 开始加载 ' + event.url);
           }
         })
         .onPageEnd((): void => {
@@ -162,11 +162,11 @@ export struct CertWeb {
             cur = '(unknown)';
           }
           this.status = '已加载: ' + cur;
-          hilog.info(0x0000, 'HAPKIT', '%{public}s', '[web] 页面加载完成 url=' + cur);
+          hilog.info(0x0000, 'HapInstaller', '%{public}s', '[web] 页面加载完成 url=' + cur);
         })
         .onLoadIntercept((event) => {
           if (event) {
-            hilog.info(0x0000, 'HAPKIT', '%{public}s', '[web] 导航 ' + event.data.getRequestUrl());
+            hilog.info(0x0000, 'HapInstaller', '%{public}s', '[web] 导航 ' + event.data.getRequestUrl());
           }
           return false;
         })

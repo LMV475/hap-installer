@@ -74,7 +74,7 @@ const ACL_KEY: string = 'aclList';
 /** 读取持久化 ACL 列表，未设置时返回默认列表副本 */
 export async function loadAclList(ctx: common.UIAbilityContext): Promise<string[]> {
   try {
-    const store = await preferences.getPreferences(ctx, 'hapkit');
+    const store = await preferences.getPreferences(ctx, 'hapinstaller');
     const raw: string = await store.get(ACL_KEY, '') as string;
     if (raw.length === 0) {
       return DEFAULT_ACL.slice();
@@ -88,7 +88,7 @@ export async function loadAclList(ctx: common.UIAbilityContext): Promise<string[
 /** 持久化 ACL 列表 */
 export async function saveAclList(ctx: common.UIAbilityContext, list: string[]): Promise<void> {
   try {
-    const store = await preferences.getPreferences(ctx, 'hapkit');
+    const store = await preferences.getPreferences(ctx, 'hapinstaller');
     await store.put(ACL_KEY, JSON.stringify(list));
     await store.flush();
   } catch (e) {
