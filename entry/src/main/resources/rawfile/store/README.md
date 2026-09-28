@@ -51,4 +51,11 @@ java -jar $JAR generate-ca -keyAlias hapinstaller-root-ca -keyPwd hapinstaller12
 # 8) 导出私钥：openssl pkcs12 -in hapinstaller.p12 -nocerts -nodes -out hapinstaller.pem
 ```
 
+> ⚠️ **两个必须遵守的细节**（否则 `sign-app` 会报错）：
+>
+> 1. **Profile JSON 里 `bundle-info.development-certificate` 的 PEM 必须带一个尾部换行符**（`-----END CERTIFICATE-----\n`）。缺了尾换行时，`sign-app` 会报 `11010001 Unknown error / Illegal base64 character 20`——这个报错与证书链、签名参数都无关，仅由尾换行缺失引起。
+> 2. `generate-app-cert` / `generate-profile-cert` 生成证书链时，签发者的密钥在**根 CA 的密钥库**里，因此必须额外传 `-issuerKeystoreFile <root-ca.p12> -issuerKeystorePwd <pwd>`，否则报 `11014001 Key alias not found`。
+>
+> 证书链顺序用 **root-first**（`[根 CA, 子 CA, 叶子证书]`），与 DevEco Studio 生成的证书一致；实测 leaf-first 也能签名成功，但建议统一为 root-first。
+
 详见项目根目录 `README.md` 的「签名配置」章节。
