@@ -1,12 +1,16 @@
-import { common } from '@kit.AbilityKit';
+import { common, Want, bundleManager } from '@kit.AbilityKit';
 import { ConfigurationConstant } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
 import { promptAction } from '@kit.ArkUI';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { fileIo } from '@kit.CoreFileKit';
+import { http } from '@kit.NetworkKit';
 import { HapCard } from '../components/HapCard';
 import { PillButton } from '../components/PillButton';
 import { topInsetVp, bottomInsetVp } from '../common/Immersive';
+
+const PROJECT_REPO: string = 'https://github.com/LMV475/hap-installer';
+const RELEASE_API: string = 'https://api.github.com/repos/LMV475/hap-installer/releases/latest';
 
 @Component
 struct MoreRow {
@@ -72,14 +76,24 @@ export struct More {
   @StorageLink('safeTopPx') safeTopPx: number = 0;
   @StorageLink('safeBottomPx') safeBottomPx: number = 0;
   @State tipText: string = '';
+  @State checkingUpdate: boolean = false;
   /** 签名配置入口：默认隐藏，连点「应用版本」十下才出现，且只在本进程内有效 */
   @State signEntryVisible: boolean = false;
   private versionTaps: number = 0;
   private lastVersionTap: number = 0;
-  private readonly appVersion: string = '1.0.0';
+  private appVersion: string = '1.0.0';
 
   aboutToAppear(): void {
     this.loadThemePrefs();
+    this.loadAppVersion();
+  }
+
+  private loadAppVersion(): void {
+    try {
+      const info = bundleManager.getBundleInfoForSelfSync(bundleManager.BundleFlag.GET_BUNDLE_INFO_DEFAULT);
+      this.appVersion = info.versionName;
+    } catch (e) {
+    }
   }
 
   private async loadThemePrefs(): Promise<void> {
@@ -104,6 +118,93 @@ export struct More {
   private openSignConfig(): void {
     AppStorage.setOrCreate<number>('selectedTab', 0);
     AppStorage.setOrCreate<number>('signSheetRequest', Date.now());
+  }
+
+  /** 用系统浏览器打开 GitHub 仓库 */
+  private openRepo(): void {
+    const want: Want = {
+      action: 'ohos.want.action.viewData',
+      uri: PROJECT_REPO,
+      entities: ['entity.system.browsable']
+    };
+    this.ctx().startAbility(want).catch((e: BusinessError): void => {
+      this.tipText = '无法打开浏览器: ' + e.message;
+    });
+  }
+
+  /** 请求 GitHub releases/latest 对比版本号 */
+  private async checkUpdate(): Promise<void> {
+    if (this.checkingUpdate) {
+      return;
+    }
+    this.checkingUpdate = true;
+    promptAction.showToast({ message: '正在检查更新…', duration: 1500 });
+    const client = http.createHttp();
+    try {
+      const resp = await client.request(RELEASE_API, {
+        method: http.RequestMethod.GET,
+        header: { 'Accept': 'application/vnd.github+json', 'User-Agent': 'HapInstaller' },
+        expectDataType: http.HttpDataType.STRING,
+        connectTimeout: 15000,
+        readTimeout: 20000
+      });
+      if (resp.responseCode !== 200) {
+        this.tipText = '检查更新失败（HTTP ' + resp.responseCode + '）';
+        return;
+      }
+      const obj: Record<string, Object> = JSON.parse(String(resp.result)) as Record<string, Object>;
+      const tagName: string = String(obj['tag_name'] ?? '');
+      const latestVersion: string = tagName.startsWith('v') ? tagName.substring(1) : tagName;
+      const htmlUrl: string = String(obj['html_url'] ?? PROJECT_REPO);
+      const body: string = String(obj['body'] ?? '');
+      if (latestVersion.length === 0) {
+        this.tipText = '未获取到版本信息';
+        return;
+      }
+      if (this.compareVersion(latestVersion, this.appVersion) > 0) {
+        const releaseNotes: string = body.length > 0 ? '\n\n' + body.substring(0, 200) : '';
+        promptAction.showDialog({
+          title: '发现新版本 v' + latestVersion,
+          message: '当前版本 v' + this.appVersion + releaseNotes,
+          buttons: [
+            { text: '前往下载', color: '#0A59F7' },
+            { text: '稍后', color: '#666666' }
+          ]
+        }).then((res: promptAction.ShowDialogSuccessResponse): void => {
+          if (res.index === 0) {
+            const want: Want = {
+              action: 'ohos.want.action.viewData',
+              uri: htmlUrl,
+              entities: ['entity.system.browsable']
+            };
+            this.ctx().startAbility(want).catch((): void => {});
+          }
+        }).catch((): void => {});
+      } else {
+        promptAction.showToast({ message: '已是最新版本 v' + this.appVersion, duration: 2000 });
+      }
+    } catch (e) {
+      const err = e as BusinessError;
+      this.tipText = '检查更新失败: ' + err.message;
+    } finally {
+      client.destroy();
+      this.checkingUpdate = false;
+    }
+  }
+
+  /** 版本号比较：返回 >0 表示 a 更新，=0 相同，<0 a 更旧 */
+  private compareVersion(a: string, b: string): number {
+    const pa: string[] = a.split('.');
+    const pb: string[] = b.split('.');
+    const len: number = Math.max(pa.length, pb.length);
+    for (let i = 0; i < len; i++) {
+      const na: number = parseInt(pa[i] ?? '0', 10);
+      const nb: number = parseInt(pb[i] ?? '0', 10);
+      if (na !== nb) {
+        return na - nb;
+      }
+    }
+    return 0;
   }
 
   private ctx(): common.UIAbilityContext {
@@ -314,6 +415,13 @@ export struct More {
     Column({ space: 0 }) {
       MoreRow({ label: '应用版本', subText: this.appVersion, type: 'text', tapable: true,
         onTap: (): void => { this.onVersionTap(); } })
+      Divider().color($r('sys.color.ohos_id_color_list_separator'))
+      MoreRow({ label: '项目地址', subText: 'GitHub 开源仓库', type: 'arrow',
+        onTap: (): void => { this.openRepo(); } })
+      Divider().color($r('sys.color.ohos_id_color_list_separator'))
+      MoreRow({ label: '检测更新', subText: this.checkingUpdate ? '检查中…' : '获取最新版本',
+        type: 'arrow', disabled: this.checkingUpdate,
+        onTap: (): void => { this.checkUpdate(); } })
     }.width('100%')
   }
 }
