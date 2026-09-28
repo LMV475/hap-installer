@@ -6,7 +6,8 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { safeAreaInsets } from '../common/Immersive';
 
-const AGC_URL: string = 'https://developer.huawei.com/consumer/cn/service/josp/agc/index.html#/harmonyOSDevPlatform/9249519184596237889';
+// AGC 通用入口：不硬编码具体项目 id，登录后由用户在控制台里进入自己的项目
+const AGC_URL: string = 'https://developer.huawei.com/consumer/cn/service/josp/agc/index.html';
 
 @Component
 export struct CertWeb {

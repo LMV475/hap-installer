@@ -17,10 +17,13 @@ import { ConnectDeviceSheet } from '../components/ConnectDeviceSheet';
 import { loadAclList } from '../common/AclDefaults';
 import { addHistoryTarget } from '../common/HistoryTargets';
 import { HapPeek } from '../common/HapPeek';
+import { getSecret, putSecret } from '../common/SecureStore';
 import { topInsetVp, bottomInsetVp } from '../common/Immersive';
 import { worker, MessageEvents, ErrorEvent, util } from '@kit.ArkTS';
 
 const SELF_BUNDLE: string = 'cn.lxh.hapinstaller';
+// 登录态在 ASSET 加密存储中的记录名
+const AGC_AUTH_ALIAS: string = 'hapinstaller_agc_auth';
 
 @Component
 export struct Home {
@@ -404,16 +407,30 @@ export struct Home {
       }
       const auth: AgcAuthInfo | null = AgcService.exportAuth();
       if (auth !== null) {
-        await store.put('agcJwt', auth.jwtToken);
-        await store.put('agcAccess', auth.accessToken);
-        await store.put('agcUser', auth.userId);
-        await store.put('agcTeam', auth.teamId);
+        // 令牌属凭据，写入系统加密密钥库（ASSET），不再明文进 preferences
+        const saved: boolean = await putSecret(AGC_AUTH_ALIAS, this.packAuth(auth));
+        if (!saved) {
+          this.log('警告：登录态写入加密存储失败，重启后需重新登录');
+        }
       }
       await store.flush();
     } catch (e) {
       const err = e as BusinessError;
       this.log('保存配置失败: ' + err.message);
     }
+  }
+
+  /** 登录态打包：4 个字段按行拼接（令牌不含换行），整体存为一条加密记录 */
+  private packAuth(auth: AgcAuthInfo): string {
+    return auth.jwtToken + '\n' + auth.accessToken + '\n' + auth.userId + '\n' + auth.teamId;
+  }
+
+  private unpackAuth(blob: string): AgcAuthInfo {
+    const parts: string[] = blob.split('\n');
+    if (parts.length < 4) {
+      return { jwtToken: '', accessToken: '', userId: '', teamId: '' };
+    }
+    return { jwtToken: parts[0], accessToken: parts[1], userId: parts[2], teamId: parts[3] };
   }
 
   private async loadConfig(): Promise<void> {
@@ -463,22 +480,20 @@ export struct Home {
       this.matLabel = this.matSource !== 'custom'
         ? '内置测试链（alias=hapinstaller）'
         : (ready === 3 ? '证书材料已就绪（来自上次配置）' : ('证书材料 ' + ready + '/3 已选'));
-      const jwt: string = await store.get('agcJwt', '') as string;
-      const access: string = await store.get('agcAccess', '') as string;
-      const uid: string = await store.get('agcUser', '') as string;
-      const team: string = await store.get('agcTeam', '') as string;
-      if (jwt.length > 0 && uid.length > 0) {
-        const auth: AgcAuthInfo = {
-          jwtToken: jwt,
-          accessToken: access,
-          userId: uid,
-          teamId: team.length > 0 ? team : uid
+      const authBlob: string = await getSecret(AGC_AUTH_ALIAS);
+      const auth: AgcAuthInfo = this.unpackAuth(authBlob);
+      if (auth.jwtToken.length > 0 && auth.userId.length > 0) {
+        const restored: AgcAuthInfo = {
+          jwtToken: auth.jwtToken,
+          accessToken: auth.accessToken,
+          userId: auth.userId,
+          teamId: auth.teamId.length > 0 ? auth.teamId : auth.userId
         };
-        AgcService.importAuth(auth);
-        this.agcUser = uid;
+        AgcService.importAuth(restored);
+        this.agcUser = auth.userId;
       }
       this.log('已载入上次配置：目标 ' + target + '，材料 ' + ready + '/3' +
-        (jwt.length > 0 ? '，登录态已恢复' : ''));
+        (auth.jwtToken.length > 0 ? '，登录态已恢复' : ''));
     } catch (e) {
       const err = e as BusinessError;
       this.log('载入配置失败: ' + err.message);
@@ -994,17 +1009,12 @@ export struct Home {
     }
   }
 
-  /** 用系统浏览器打开 AGC 页面（证书/设备管理） */
+  /** 用系统浏览器打开 AGC 通用入口（证书/设备管理都在里面）；不硬编码具体项目 id */
   private async openAgc(which: string): Promise<void> {
-    let url: string = 'https://developer.huawei.com/consumer/cn/service/josp/agc/index.html#/';
-    if (which === 'cert') {
-      url = 'https://developer.huawei.com/consumer/cn/service/josp/agc/index.html#/harmonyOSDevPlatform/9249519184596237889';
-    } else if (which === 'device') {
-      url = 'https://developer.huawei.com/consumer/cn/service/josp/agc/index.html#/harmonyOSDevPlatform/9249519184596237889';
-    }
+    const url: string = 'https://developer.huawei.com/consumer/cn/service/josp/agc/index.html';
     try {
       await this.ctx().openLink(url);
-      this.log('已打开浏览器: ' + url);
+      this.log('已打开浏览器（' + which + '）: ' + url);
       return;
     } catch (e) {
       const err = e as BusinessError;
