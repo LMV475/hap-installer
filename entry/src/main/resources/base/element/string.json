@@ -2,6 +2,6 @@
   "string": [
     { "name": "module_desc", "value": "鸿蒙调试与安装工具箱" },
     { "name": "EntryAbility_desc", "value": "主入口" },
-    { "name": "EntryAbility_label", "value": "HAPKit" }
+    { "name": "EntryAbility_label", "value": "HapInstaller" }
   ]
 }

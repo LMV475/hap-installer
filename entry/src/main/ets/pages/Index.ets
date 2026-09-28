@@ -25,7 +25,7 @@ struct Index {
   @StorageLink('isDark') isDark: boolean = false;
   /** Tabs 实际高度（vp），用来把「浮层底部」换算成模糊渐变的收尾比例 */
   @State tabsVp: number = 1;
-  private tabTitles: string[] = ['HAPKit', '证书管理', '调试历史', '更多'];
+  private tabTitles: string[] = ['HapInstaller', '证书管理', '调试历史', '更多'];
 
   @Builder
   pageMap(name: string) {

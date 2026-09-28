@@ -716,7 +716,7 @@ export struct Home {
       const acl: string[] = await this.aclForTarget();
       this.log('申请 Profile: ' + profileName + '，ACL: ' + (acl.length > 0 ? acl.join('、') : '无'));
       const url: string = await AgcService.createProfile(profileName, certId, ids, acl, pkg);
-      // 按包名落盘（对齐 PC 的 <pkg>.p7b），避免覆盖 HAPKit 自身的调试 Profile
+      // 按包名落盘（对齐 PC 的 <pkg>.p7b），避免覆盖 HapInstaller 自身的调试 Profile
       const fname: string = pkg.replace(/\./g, '_') + '.p7b';
       await this.downloadTo(url, fname);
       const tmp: string = this.ctx().tempDir + '/' + fname;
@@ -1336,7 +1336,7 @@ export struct Home {
     }
     let message: string = '';
     if (isSelf) {
-      message = '将在设备上覆盖安装 HAPKit（本应用），装机后本应用会自动重启。';
+      message = '将在设备上覆盖安装 HapInstaller（本应用），装机后本应用会自动重启。';
     } else {
       const st: number = await this.probeInstalled(instBundle);
       if (st === 0) {
