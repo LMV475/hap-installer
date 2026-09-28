@@ -17,6 +17,7 @@ export struct Cert {
   @StorageLink('safeBottomPx') safeBottomPx: number = 0;
   @State certs: AgcCertInfo[] = [];
   @State loading: boolean = false;
+  @State isRefreshing: boolean = false;
   @State tipText: string = '';
   @State currentName: string = '';
 
@@ -28,9 +29,15 @@ export struct Cert {
     return this.getUIContext().getHostContext() as common.UIAbilityContext;
   }
 
+  private finishRefresh(): void {
+    this.loading = false;
+    this.isRefreshing = false;
+  }
+
   private async refresh(): Promise<void> {
     if (!AgcService.isLoggedIn()) {
       this.certs = [];
+      this.finishRefresh();
       return;
     }
     this.loading = true;
@@ -43,13 +50,13 @@ export struct Cert {
         const msg: string = err0.message || '';
         if (msg.indexOf('过期') < 0 && msg.indexOf('401') < 0) {
           this.tipText = '加载失败: ' + msg;
-          this.loading = false;
+          this.finishRefresh();
           return;
         }
         const ok: boolean = await AgcService.refreshAuth();
         if (!ok) {
           this.tipText = '登录已过期，请在首页重新登录华为账号';
-          this.loading = false;
+          this.finishRefresh();
           return;
         }
         this.certs = await AgcService.getCertList();
@@ -62,7 +69,7 @@ export struct Cert {
       const err = e as BusinessError;
       this.tipText = '加载失败: ' + err.message;
     }
-    this.loading = false;
+    this.finishRefresh();
   }
 
   private inferNameFromCerts(_cerPath: string): string {
@@ -151,54 +158,54 @@ export struct Cert {
   }
 
   build() {
-    Scroll() {
-      Column({ space: 12 }) {
-        HapCard({ content: (): void => { this.tipBody() } })
+    Refresh({ refreshing: $$this.isRefreshing }) {
+      Scroll() {
+        Column({ space: 12 }) {
+          HapCard({ content: (): void => { this.tipBody() } })
 
-        if (!AgcService.isLoggedIn()) {
-          HapCard({ content: (): void => { this.loginPrompt() } })
-        } else if (this.loading) {
-          Text('加载中…').fontSize(13)
-            .fontColor($r('sys.color.ohos_id_color_text_secondary'))
+          if (!AgcService.isLoggedIn()) {
+            HapCard({ content: (): void => { this.loginPrompt() } })
+          } else if (this.loading) {
+            Text('加载中…').fontSize(13)
+              .fontColor($r('sys.color.ohos_id_color_text_secondary'))
+              .width('100%')
+              .padding($r('sys.float.padding_level5'))
+          } else if (this.certs.length === 0) {
+            HapCard({ content: (): void => { this.emptyBody() } })
+          } else {
+            Column({ space: 0 }) {
+              ForEach(this.certs, (c: AgcCertInfo): void => {
+                this.certRow(c)
+                if (this.certs.indexOf(c) < this.certs.length - 1) {
+                  Divider().color($r('sys.color.ohos_id_color_list_separator'))
+                }
+              }, (c: AgcCertInfo): string => c.id)
+            }
             .width('100%')
-            .padding($r('sys.float.padding_level5'))
-        } else if (this.certs.length === 0) {
-          HapCard({ content: (): void => { this.emptyBody() } })
-        } else {
-          Column({ space: 0 }) {
-            ForEach(this.certs, (c: AgcCertInfo): void => {
-              this.certRow(c)
-              if (this.certs.indexOf(c) < this.certs.length - 1) {
-                Divider().color($r('sys.color.ohos_id_color_list_separator'))
-              }
-            }, (c: AgcCertInfo): string => c.id)
+            .padding({ left: $r('sys.float.padding_level5'), right: $r('sys.float.padding_level5') })
+            .borderRadius($r('sys.float.corner_radius_level6'))
+            .backgroundColor($r('sys.color.ohos_id_color_card_bg'))
           }
-          .width('100%')
-          .padding({ left: $r('sys.float.padding_level5'), right: $r('sys.float.padding_level5') })
-          .borderRadius($r('sys.float.corner_radius_level6'))
-          .backgroundColor($r('sys.color.ohos_id_color_card_bg'))
-        }
-
-        Row() {
-          PillButton({ label: this.loading ? '刷新中…' : '刷新列表',
-            enabled_: !this.loading,
-            onClickAction: (): void => { this.refresh(); } })
         }
         .width('100%')
-        .justifyContent(FlexAlign.Center)
+        .padding({ left: $r('sys.float.padding_level6'), right: $r('sys.float.padding_level6'),
+          bottom: bottomInsetVp(this.getUIContext(), this.safeBottomPx) })
+        .alignItems(HorizontalAlign.Start)
       }
       .width('100%')
-      .padding({ left: $r('sys.float.padding_level6'), right: $r('sys.float.padding_level6'),
-        top: topInsetVp(this.getUIContext(), this.safeTopPx),
-        bottom: bottomInsetVp(this.getUIContext(), this.safeBottomPx) })
-      .alignItems(HorizontalAlign.Start)
+      .height('100%')
+      .align(Alignment.TopStart)
+      .edgeEffect(EdgeEffect.Spring)
+      .scrollBar(BarState.Off)
     }
     .width('100%')
     .height('100%')
     .backgroundColor($r('sys.color.ohos_id_color_sub_background'))
-    .align(Alignment.TopStart)
-    .edgeEffect(EdgeEffect.Spring)
-    .scrollBar(BarState.Off)
+    .padding({ top: topInsetVp(this.getUIContext(), this.safeTopPx) })
+    .refreshOffset(32)
+    .onRefreshing(() => {
+      this.refresh();
+    })
   }
 
   @Builder

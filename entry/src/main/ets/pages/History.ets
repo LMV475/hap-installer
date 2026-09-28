@@ -12,6 +12,7 @@ export struct History {
   @StorageLink('safeBottomPx') safeBottomPx: number = 0;
   @State rows: HistoryRow[] = [];
   @State loading: boolean = false;
+  @State isRefreshing: boolean = false;
   @State tipText: string = '';
   @State expandedId: number = -1;
 
@@ -33,6 +34,7 @@ export struct History {
       this.tipText = '加载失败: ' + err.message;
     }
     this.loading = false;
+    this.isRefreshing = false;
   }
 
   private fmt(ts: number): string {
@@ -88,57 +90,57 @@ export struct History {
   }
 
   build() {
-    Scroll() {
-      Column({ space: 12 }) {
-        if (this.tipText.length > 0) {
-          Text(this.tipText)
-            .fontSize(11)
-            .fontColor($r('sys.color.ohos_id_color_emphasize'))
-            .width('100%')
-        }
-
-        if (this.loading) {
-          Text('加载中…').fontSize(13)
-            .fontColor($r('sys.color.ohos_id_color_text_secondary'))
-            .width('100%')
-            .padding($r('sys.float.padding_level5'))
-        } else if (this.rows.length === 0) {
-          HapCard({ content: (): void => { this.emptyBody() } })
-        } else {
-          Column({ space: 0 }) {
-            ForEach(this.rows, (r: HistoryRow): void => {
-              this.rowView(r)
-              if (this.rows.indexOf(r) < this.rows.length - 1) {
-                Divider().color($r('sys.color.ohos_id_color_list_separator'))
-              }
-            }, (r: HistoryRow): string => r.id.toString())
+    Refresh({ refreshing: $$this.isRefreshing }) {
+      Scroll() {
+        Column({ space: 12 }) {
+          if (this.tipText.length > 0) {
+            Text(this.tipText)
+              .fontSize(11)
+              .fontColor($r('sys.color.ohos_id_color_emphasize'))
+              .width('100%')
           }
-          .width('100%')
-          .padding({ left: $r('sys.float.padding_level5'), right: $r('sys.float.padding_level5') })
-          .borderRadius($r('sys.float.corner_radius_level6'))
-          .backgroundColor($r('sys.color.ohos_id_color_card_bg'))
-        }
 
-        Row() {
-          PillButton({ label: this.loading ? '刷新中…' : '刷新列表',
-            enabled_: !this.loading,
-            onClickAction: (): void => { this.refresh(); } })
+          if (this.loading) {
+            Text('加载中…').fontSize(13)
+              .fontColor($r('sys.color.ohos_id_color_text_secondary'))
+              .width('100%')
+              .padding($r('sys.float.padding_level5'))
+          } else if (this.rows.length === 0) {
+            HapCard({ content: (): void => { this.emptyBody() } })
+          } else {
+            Column({ space: 0 }) {
+              ForEach(this.rows, (r: HistoryRow): void => {
+                this.rowView(r)
+                if (this.rows.indexOf(r) < this.rows.length - 1) {
+                  Divider().color($r('sys.color.ohos_id_color_list_separator'))
+                }
+              }, (r: HistoryRow): string => r.id.toString())
+            }
+            .width('100%')
+            .padding({ left: $r('sys.float.padding_level5'), right: $r('sys.float.padding_level5') })
+            .borderRadius($r('sys.float.corner_radius_level6'))
+            .backgroundColor($r('sys.color.ohos_id_color_card_bg'))
+          }
         }
         .width('100%')
-        .justifyContent(FlexAlign.Center)
+        .padding({ left: $r('sys.float.padding_level6'), right: $r('sys.float.padding_level6'),
+          bottom: bottomInsetVp(this.getUIContext(), this.safeBottomPx) })
+        .alignItems(HorizontalAlign.Start)
       }
       .width('100%')
-      .padding({ left: $r('sys.float.padding_level6'), right: $r('sys.float.padding_level6'),
-        top: topInsetVp(this.getUIContext(), this.safeTopPx),
-        bottom: bottomInsetVp(this.getUIContext(), this.safeBottomPx) })
-      .alignItems(HorizontalAlign.Start)
+      .height('100%')
+      .align(Alignment.TopStart)
+      .edgeEffect(EdgeEffect.Spring)
+      .scrollBar(BarState.Off)
     }
     .width('100%')
     .height('100%')
     .backgroundColor($r('sys.color.ohos_id_color_sub_background'))
-    .align(Alignment.TopStart)
-    .edgeEffect(EdgeEffect.Spring)
-    .scrollBar(BarState.Off)
+    .padding({ top: topInsetVp(this.getUIContext(), this.safeTopPx) })
+    .refreshOffset(32)
+    .onRefreshing(() => {
+      this.refresh();
+    })
   }
 
   @Builder
