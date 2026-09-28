@@ -161,7 +161,7 @@ export struct Home {
       await this.exportFile(this.ctx().tempDir + '/signed.hap', '/data/local/tmp/partial_signed.hap');
       await this.exportFile(this.ctx().filesDir + '/hapinstaller-debug.cer', '/data/local/tmp/hapinstaller-debug.cer');
       await this.exportFile(this.ctx().filesDir + '/hapinstaller-debug.p7b', '/data/local/tmp/hapinstaller-debug.p7b');
-      await this.exportFile(this.ctx().filesDir + '/xiaobai.p12', '/data/local/tmp/xiaobai.p12');
+      await this.exportFile(this.ctx().filesDir + '/hapinstaller.p12', '/data/local/tmp/hapinstaller.p12');
       await this.exportFile(this.ctx().filesDir + '/hapinstaller.log', '/data/local/tmp/hapinstaller.log');
     }
 
@@ -472,15 +472,15 @@ export struct Home {
   /**
    * PC 端 initSignConfig 的默认值兜底语义：
    * 材料路径缺失/失效时回填沙箱默认材料（缺失则从内置 rawfile 释放）；
-   * 口令仅在密钥库为内置 xiaobai.p12 时内存回填，绝不落盘（§十七）。
+   * 口令仅在密钥库为内置 hapinstaller.p12 时内存回填，绝不落盘（§十七）。
    */
   private healMaterials(): string[] {
     const f: string = this.ctx().filesDir;
     const healed: string[] = [];
     if (this.p12Path.length === 0 || !fileIo.accessSync(this.p12Path)) {
-      const def: string = f + '/xiaobai.p12';
+      const def: string = f + '/hapinstaller.p12';
       if (!fileIo.accessSync(def)) {
-        this.releaseBuiltin('xiaobai.p12');
+        this.releaseBuiltin('hapinstaller.p12');
       }
       if (fileIo.accessSync(def)) {
         this.p12Path = def;
@@ -489,9 +489,9 @@ export struct Home {
     }
     if (this.cerPath.length === 0 || !fileIo.accessSync(this.cerPath)) {
       const fresh: string = f + '/hapinstaller-debug.cer';
-      const builtin: string = f + '/xiaobai-debug.cer';
+      const builtin: string = f + '/hapinstaller-builtin.cer';
       if (!fileIo.accessSync(fresh) && !fileIo.accessSync(builtin)) {
-        this.releaseBuiltin('xiaobai-debug.cer');
+        this.releaseBuiltin('hapinstaller-builtin.cer');
       }
       const pick: string = fileIo.accessSync(fresh) ? fresh : builtin;
       if (fileIo.accessSync(pick)) {
@@ -501,9 +501,9 @@ export struct Home {
     }
     if (this.p7bPath.length === 0 || !fileIo.accessSync(this.p7bPath)) {
       const fresh: string = f + '/hapinstaller-debug.p7b';
-      const builtin: string = f + '/xiaobai-debug.p7b';
+      const builtin: string = f + '/hapinstaller-builtin.p7b';
       if (!fileIo.accessSync(fresh) && !fileIo.accessSync(builtin)) {
-        this.releaseBuiltin('xiaobai-debug.p7b');
+        this.releaseBuiltin('hapinstaller-builtin.p7b');
       }
       const pick: string = fileIo.accessSync(fresh) ? fresh : builtin;
       if (fileIo.accessSync(pick)) {
@@ -511,9 +511,9 @@ export struct Home {
         healed.push('Profile');
       }
     }
-    if (this.keyPwd.length === 0 && this.p12Path === f + '/xiaobai.p12') {
-      this.keyPwd = 'xiaobai123';
-      this.keyAlias = 'xiaobai';
+    if (this.keyPwd.length === 0 && this.p12Path === f + '/hapinstaller.p12') {
+      this.keyPwd = 'hapinstaller123';
+      this.keyAlias = 'hapinstaller';
       healed.push('口令(仅内存)');
     }
     return healed;
@@ -601,9 +601,9 @@ export struct Home {
     this.busy = true;
     this.status = '申请证书中…';
     try {
-      const csrPath: string = this.ctx().filesDir + '/xiaobai.csr';
+      const csrPath: string = this.ctx().filesDir + '/hapinstaller.csr';
       if (!fileIo.accessSync(csrPath)) {
-        const data: Uint8Array = this.ctx().resourceManager.getRawFileContentSync('store/xiaobai.csr');
+        const data: Uint8Array = this.ctx().resourceManager.getRawFileContentSync('store/hapinstaller.csr');
         const outFile = fileIo.openSync(csrPath,
           fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE | fileIo.OpenMode.TRUNC);
         fileIo.writeSync(outFile.fd, data.buffer as ArrayBuffer);
@@ -638,9 +638,9 @@ export struct Home {
         this.cerPath = cerPath;
         this.log('证书已下载: ' + cerPath);
       }
-      this.p12Path = this.ctx().filesDir + '/xiaobai.p12';
-      this.keyAlias = 'xiaobai';
-      this.keyPwd = 'xiaobai123';
+      this.p12Path = this.ctx().filesDir + '/hapinstaller.p12';
+      this.keyAlias = 'hapinstaller';
+      this.keyPwd = 'hapinstaller123';
       await this.saveConfig();
       this.status = '证书就绪';
     } catch (e) {
@@ -740,7 +740,7 @@ export struct Home {
   private async doUseBuiltin(): Promise<void> {
     this.busy = true;
     try {
-      const files: string[] = ['xiaobai.p12', 'xiaobai-debug.cer', 'xiaobai-debug.p7b'];
+      const files: string[] = ['hapinstaller.p12', 'hapinstaller-builtin.cer', 'hapinstaller-builtin.p7b'];
       for (const name of files) {
         const target: string = this.ctx().filesDir + '/' + name;
         const data: Uint8Array = this.ctx().resourceManager.getRawFileContentSync('store/' + name);
@@ -752,15 +752,15 @@ export struct Home {
       }
       const freshCer: string = this.ctx().filesDir + '/hapinstaller-debug.cer';
       const freshP7b: string = this.ctx().filesDir + '/hapinstaller-debug.p7b';
-      this.p12Path = this.ctx().filesDir + '/xiaobai.p12';
-      // 内置的是 2025-08 过期的起手包，若已有 AGC 新签发材料则优先使用
-      this.cerPath = fileIo.accessSync(freshCer) ? freshCer : this.ctx().filesDir + '/xiaobai-debug.cer';
-      this.p7bPath = fileIo.accessSync(freshP7b) ? freshP7b : this.ctx().filesDir + '/xiaobai-debug.p7b';
-      this.keyAlias = 'xiaobai';
-      this.keyPwd = 'xiaobai123';
-      this.matLabel = '证书材料 3/3（alias=xiaobai）';
+      this.p12Path = this.ctx().filesDir + '/hapinstaller.p12';
+      // 内置的是自签名测试链，若已有 AGC 新签发材料则优先使用
+      this.cerPath = fileIo.accessSync(freshCer) ? freshCer : this.ctx().filesDir + '/hapinstaller-builtin.cer';
+      this.p7bPath = fileIo.accessSync(freshP7b) ? freshP7b : this.ctx().filesDir + '/hapinstaller-builtin.p7b';
+      this.keyAlias = 'hapinstaller';
+      this.keyPwd = 'hapinstaller123';
+      this.matLabel = '证书材料 3/3（alias=hapinstaller）';
       await this.saveConfig();
-      this.log('内置材料就绪：alias=xiaobai，可直接签名');
+      this.log('内置材料就绪：alias=hapinstaller，可直接签名');
     } catch (e) {
       const err = e as BusinessError;
       this.log('释放内置材料失败: ' + err.message);
