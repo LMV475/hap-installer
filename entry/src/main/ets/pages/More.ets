@@ -76,7 +76,7 @@ export struct More {
   @State signEntryVisible: boolean = false;
   private versionTaps: number = 0;
   private lastVersionTap: number = 0;
-  private readonly appVersion: string = '3.1.0';
+  private readonly appVersion: string = '1.0.0';
 
   aboutToAppear(): void {
     this.loadThemePrefs();

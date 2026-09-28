@@ -120,7 +120,7 @@ export struct History {
         }
 
         Row() {
-          PillButton({ label: this.loading ? '刷新中…' : '刷新',
+          PillButton({ label: this.loading ? '刷新中…' : '刷新列表',
             enabled_: !this.loading,
             onClickAction: (): void => { this.refresh(); } })
         }
