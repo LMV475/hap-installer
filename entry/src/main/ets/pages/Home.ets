@@ -512,18 +512,26 @@ export struct Home {
       if (!fileIo.accessSync(freshCer) && !fileIo.accessSync(builtinCer)) {
         this.releaseBuiltin('hapinstaller-builtin.cer');
       }
-      const cerPick: string = fileIo.accessSync(freshCer) ? freshCer : builtinCer;
-      if (fileIo.accessSync(cerPick) && this.cerPath !== cerPick) {
-        this.cerPath = cerPick;
-        healed.push('证书链(内置)');
-      }
       if (!fileIo.accessSync(freshP7b) && !fileIo.accessSync(builtinP7b)) {
         this.releaseBuiltin('hapinstaller-builtin.p7b');
       }
-      const p7bPick: string = fileIo.accessSync(freshP7b) ? freshP7b : builtinP7b;
+      // 证书链与 Profile 必须来自同一套（AGC 配 AGC、内置配内置）：
+      // 「AGC 证书 + 内置 Profile」这类错配仍能签出 HAP，但装包阶段会报
+      // code:9568257 fail to verify pkcs7 file。AGC Profile 由 doApplyProfile 按目标包名落盘，
+      // 所以「当前 Profile 是已存在的非内置/非 fresh 文件」即代表处于 AGC 套件。
+      const curP7bIsAgc: boolean = this.p7bPath.length > 0 && fileIo.accessSync(this.p7bPath)
+        && this.p7bPath !== builtinP7b && this.p7bPath !== freshP7b;
+      const agcP7b: string = fileIo.accessSync(freshP7b) ? freshP7b : (curP7bIsAgc ? this.p7bPath : '');
+      const useAgc: boolean = agcP7b.length > 0 && fileIo.accessSync(freshCer);
+      const cerPick: string = useAgc ? freshCer : builtinCer;
+      const p7bPick: string = useAgc ? agcP7b : builtinP7b;
+      if (fileIo.accessSync(cerPick) && this.cerPath !== cerPick) {
+        this.cerPath = cerPick;
+        healed.push(useAgc ? '证书链(AGC)' : '证书链(内置)');
+      }
       if (fileIo.accessSync(p7bPick) && this.p7bPath !== p7bPick) {
         this.p7bPath = p7bPick;
-        healed.push('Profile(内置)');
+        healed.push(useAgc ? 'Profile(AGC)' : 'Profile(内置)');
       }
       // 内置链的 alias/口令不再回填输入框（保持「默认无填充」）：
       // 留空时由 useAlias()/usePwd() 在签名时按内置默认值兜底
@@ -752,9 +760,11 @@ export struct Home {
       }
       this.log('AGC 证书列表: ' + (seen.length > 0 ? seen.join('、') : '（空）'));
       let certId: string = '';
+      let certObjectId: string = '';
       for (const c of certs) {
         if (c.certName === 'hapinstaller-debug') {
           certId = c.id;
+          certObjectId = c.certObjectId;
         }
       }
       if (certId.length === 0) {
@@ -768,6 +778,7 @@ export struct Home {
         for (const c of again) {
           if (c.certName === 'hapinstaller-debug') {
             certId = c.id;
+            certObjectId = c.certObjectId;
           }
         }
       }
@@ -777,6 +788,9 @@ export struct Home {
         this.busy = false;
         return;
       }
+      // 关键：AGC Profile 绑定的就是「hapinstaller-debug」这张证书，签名必须用同一张，
+      // 否则签出的 HAP 在装包阶段报 code:9568257 fail to verify pkcs7 file。
+      await this.alignCertToAgcProfile(certObjectId);
       const profileName: string = 'hapinstaller-debug_' + pkg.replace(/\./g, '_');
       // 对齐 PC getAcl：只申请目标包真正声明、且落在 ACL 白名单内的受限权限
       const acl: string[] = await this.aclForTarget();
@@ -800,6 +814,47 @@ export struct Home {
       this.status = 'Profile 申请失败';
     }
     this.busy = false;
+  }
+
+  /**
+   * 让签名用的证书链与 AGC Profile 配套。
+   * AGC Profile 绑定的就是「hapinstaller-debug」这张证书，签名必须用同一张，
+   * 否则签出的 HAP 能通过 sign-app，却在装包阶段报 code:9568257 fail to verify pkcs7 file。
+   * 该证书由内置 CSR 签发，私钥在内置密钥库 hapinstaller.p12，所以三者是配套的。
+   * certObjectId 传空时自行查一次证书列表。
+   */
+  private async alignCertToAgcProfile(certObjectId: string): Promise<void> {
+    let objectId: string = certObjectId;
+    if (objectId.length === 0 && AgcService.isLoggedIn()) {
+      const certs: AgcCertInfo[] = await AgcService.getCertList();
+      for (const c of certs) {
+        if (c.certName === 'hapinstaller-debug') {
+          objectId = c.certObjectId;
+        }
+      }
+    }
+    const certFile: string = this.ctx().filesDir + '/hapinstaller-debug.cer';
+    if (!fileIo.accessSync(certFile) && objectId.length > 0) {
+      this.log('下载与 Profile 配套的 AGC 证书…');
+      const certUrl: string = await AgcService.certDownloadUrl(objectId);
+      await this.downloadTo(certUrl, 'hapinstaller-debug.cer');
+      const tmpCer: string = this.ctx().tempDir + '/hapinstaller-debug.cer';
+      if (fileIo.accessSync(tmpCer)) {
+        fileIo.copyFileSync(tmpCer, certFile);
+      }
+    }
+    if (fileIo.accessSync(certFile)) {
+      const pairP12: string = this.ctx().filesDir + '/hapinstaller.p12';
+      if (!fileIo.accessSync(pairP12)) {
+        this.releaseBuiltin('hapinstaller.p12');
+      }
+      this.cerPath = certFile;
+      this.p12Path = pairP12;
+      this.matSource = 'builtin';
+      this.log('签名材料已对齐 Profile：证书链 = hapinstaller-debug.cer，密钥库 = hapinstaller.p12');
+    } else {
+      this.log('警告：AGC 证书未就位；证书链与 Profile 不配套时会在装包阶段报 pkcs7 校验失败');
+    }
   }
 
   /** 使用内置材料（密钥库 + 证书链 + Profile，来自 assets/store），免去生成与上传 */
@@ -1184,6 +1239,8 @@ export struct Home {
       this.p7bPath = dst;
       if (this.profileBundleName() === pkg) {
         this.log('[sign] 复用已缓存 Profile: ' + dst);
+        // 缓存命中会跳过 doApplyProfile，这里仍需把证书链对齐，否则会用内置自签链签名
+        await this.alignCertToAgcProfile('');
         return true;
       }
     }
