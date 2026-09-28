@@ -60,3 +60,6 @@ entry/src/main/resources/rawfile/store/*.csr
 # ===== OS 杂项 =====
 .DS_Store
 Thumbs.db
+
+# 本地发布产物（HAP 等）
+/dist/
