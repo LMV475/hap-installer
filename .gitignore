@@ -30,9 +30,7 @@ entry/src/AppScope/
 # ===== 第三方官方源码副本（需手动获取，见 README） =====
 # hapsigner 官方源码及其内置第三方依赖
 entry/src/main/cpp/hapsigner/source/
-entry/src/main/cpp/hapsigner/third_party/zlib/source/
-entry/src/main/cpp/hapsigner/third_party/json/source/
-entry/src/main/cpp/hapsigner/third_party/bzip2/source/
+entry/src/main/cpp/hapsigner/third_party/
 
 # bounds_checking_function 官方源码
 entry/src/main/cpp/third_party/bounds_checking_function/
