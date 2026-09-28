@@ -1,0 +1,6 @@
+{
+  "name": "libhdc_z.so",
+  "types": "./index.d.ts",
+  "version": "1.0.0",
+  "description": "hdc host 内核（OpenHarmony developtools_hdc）"
+}

@@ -1,0 +1,6 @@
+{
+  "name": "libsigntool.so",
+  "types": "./index.d.ts",
+  "version": "1.0.0",
+  "description": "端侧 hap 签名（OpenHarmony developtools_hapsigner）"
+}
