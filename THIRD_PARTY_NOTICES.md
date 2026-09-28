@@ -12,7 +12,7 @@
 | HDC (`hdctools`) | 3.2.1 (`HDC_VERSION_NUMBER = 0x30200100`) | Apache-2.0 | 端侧设备连接与安装通道 | 源码编入 `libhdc_z.so` |
 | hapsigner (`hap-sign-tool`) | 随 DevEco SDK | Apache-2.0 | 端侧 HAP 签名与校验 | `libsigntool.so` |
 | OpenSSL | 3.2.0 | Apache-2.0 | 签名/验签的密码学原语 | `libcrypto.a`、`libssl.a` 静态链入 |
-| **libusb** | **1.0.28** | **LGPL-2.1** ⚠️ | HDC 的 USB 传输后端 | 静态链入 `libhdc_z.so` |
+| ~~libusb~~ | ~~1.0.28~~ | ~~LGPL-2.1~~ | HDC 的 USB 传输后端 | **已移除**，见下 |
 | lz4 | 随 hdctools | BSD-2-Clause | HDC 传输压缩 | 静态链入 `libhdc_z.so` |
 | zlib | 随 hapsigner | zlib License | 压缩 | 静态链入 `libsigntool.so` |
 | nlohmann/json | 随 hapsigner | MIT | Profile / 配置解析 | 静态链入 `libsigntool.so` |
@@ -20,19 +20,25 @@
 | bounds_checking_function | 随 OpenHarmony | MulanPSL-2.0 | 安全 C 字符串/内存函数 | 静态链入 |
 | libc++ (LLVM) | 随 DevEco SDK | Apache-2.0 with LLVM Exception | C++ 运行库 | `libc++_shared.so` |
 
-上述组件中除 **libusb** 外均为宽松许可证，再分发时仅需保留版权声明与许可证原文。
+上述组件均为**宽松许可证**（Apache-2.0 / MIT / BSD / zlib / MulanPSL-2.0），再分发时仅需保留版权声明与许可证原文。
 
-## ⚠️ 关于 libusb 与 LGPL-2.1
+## libusb 已移除（LGPL-2.1 依赖已消除）
 
-libusb 采用 **GNU Lesser General Public License v2.1**，且在本项目中是**静态链接**进 `libhdc_z.so` 的（见 `entry/src/main/cpp/hdctools/CMakeLists.txt` 中的 `usb` 静态库目标）。LGPL-2.1 允许静态链接，但要求分发者保证接收者**能够以修改后的 libusb 重新链接本作品**。
+本项目的早期构建曾通过 `entry/src/main/cpp/hdctools/CMakeLists.txt` 中的 `usb` 静态库目标，把 **libusb 1.0.28** 静态链接进 `libhdc_z.so`。libusb 采用 **LGPL-2.1**，静态链接会带来「保证接收者能够以修改后的 libusb 重新链接本作品」的义务。
 
-本项目的合规立场：
+该依赖现已**完全移除**：
 
-1. 本仓库以 Apache-2.0 公开**全部自有源码**与完整构建脚本（`CMakeLists.txt`、`build-profile.json5.example`、README 中的构建步骤），任何人可自行替换 libusb 源码后重新构建产物；
-2. 所使用的 libusb 为标准上游 **1.0.28** 版本，**未作任何修改**，可直接从上游获取；
-3. 本项目**不修改也不转授** libusb 本身的许可证条款。
+- `CMakeLists.txt` 删除了 libusb 的头文件目录、静态库目标与 `usb` 链接项，并新增全局宏 `-DHDC_NO_USB`；
+- `source/src/host/host_usb.cpp`（libusb 传输后端）不再参与编译；
+- `host_usb.h` 在 `HDC_NO_USB` 下退化为 no-op 桩类，因此 `server.cpp` / `server.h` 无需改动；
+- 上游 `source/` 内的相应改动以 `entry/src/main/cpp/hdctools/fix_no_libusb.patch` 分发（应用步骤见 README）。
 
-**若你以二进制形式再分发**，除本文件外还应附带 libusb 的 LGPL-2.1 完整原文及源码获取途径。若你的使用场景不接受 LGPL 依赖，可考虑：将 libusb 改为动态链接（`add_library(usb SHARED ...)`），或在构建时排除 hdc 的 USB 传输后端（需同步改动上游 `source/src/host/` 下的 `host_usb.cpp`、`server.h`、`server.cpp`、`main.cpp`）。
+验证（`libhdc_z.so`）：`nm -D | grep -c libusb_` = **0**（移除前 `106`）；`strings | grep -ci libusb` = **0**（移除前 `638`）；`.hap` 内打包的副本同样为 `0`。
+
+**代价**：HDC 的 **USB 主机传输后端不再可用**（TCP 与 UART 后端不受影响）。若你确实需要 USB 直连，可自行恢复该后端——届时 LGPL-2.1 义务随之回归，请重新评估。
+
+> **历史立场（现已不适用）**：移除前的论证是「公开全部自有源码与构建脚本供他人替换 libusb 后重新链接、使用未修改的标准上游 1.0.28、不转授其许可证条款」。当前构建已不含任何 libusb 代码，无需该论证。
+
 
 ## 许可证原文获取
 
@@ -43,7 +49,7 @@ libusb 采用 **GNU Lesser General Public License v2.1**，且在本项目中是
 | HDC | OpenHarmony `developtools_hdc`（源码包内 `LICENSE`） |
 | hapsigner | OpenHarmony `security_hapsigntool`（源码包内 `LICENSE`、`NOTICE`） |
 | OpenSSL | OpenHarmony third_party_openssl 或 https://www.openssl.org/source/ |
-| libusb | OpenHarmony third_party_libusb 或 https://libusb.info/（源码包内 `COPYING`） |
+| ~~libusb~~ | 已移除，无需获取 |
 | lz4 | OpenHarmony third_party_lz4（`lib/LICENSE`） |
 | zlib | https://zlib.net/（源码包内 `LICENSE`） |
 | nlohmann/json | https://github.com/nlohmann/json（`LICENSE.MIT`） |

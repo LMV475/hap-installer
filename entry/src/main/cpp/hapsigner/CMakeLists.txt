@@ -151,8 +151,9 @@ set(cflags
 if(OHOS)
 add_definitions(-DHILOG )
 endif()
-#多线程有问题， 容易崩溃，限制线程数1
-#source/hapsigntool_cpp/codesigning/fsverity/include/thread_pool.h
+# 多线程在设备沙箱内会触发 signo(42) 崩溃。单线程由上游
+# codesigning/fsverity/include/sign_thread_pool.h 的 GetSharedSignPool()
+# 以 ThreadPool(1) 在调用点实现，无需（也不能）在此覆盖 thread_pool.h。
 
 include_directories(${include_dirs} ${CMAKE_CURRENT_SOURCE_DIR})
 

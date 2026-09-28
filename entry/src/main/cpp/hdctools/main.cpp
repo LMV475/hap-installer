@@ -174,7 +174,9 @@
       * setenv and getenv concurrent calling wiil cause crash
       * NOW, for hdc server setenv are SetLibusbLogLevelEnv and HdcServer construct
      */
+#ifndef HDC_NO_USB
      HdcHostUSB::SetLibusbLogLevelEnv(HdcHostUSB::GetLibusbLogLevel());
+#endif
      HdcServer server(true);
      if (!server.Initial(serverListenString.c_str())) {
          Base::PrintMessage("Initial failed");

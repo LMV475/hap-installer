@@ -1,0 +1,12 @@
+# ===== 补丁文件：必须按字节原样入库 =====
+#
+# 这些补丁的「目标」是未纳入本仓库的上游 OpenHarmony 源码（entry/src/main/cpp/*/source/），
+# 而这些上游文件的行尾是 **CRLF**。补丁的 context 行必须与目标逐字节一致才能应用。
+#
+# 仓库默认 core.autocrlf=input 会把 CRLF 归一成 LF 后再入库，导致 clone 出来的补丁
+# 对着 CRLF 的上游源码打时全部 hunk 失败（实测报 "hunks failed"）。
+# 因此这里对补丁文件禁用行尾转换（-text），保证仓库中保存的就是 CRLF 原件。
+#
+# 注意：请勿用编辑器「转换行尾」功能改写这些补丁，也不要删除以下两行。
+*.patch -text
+*.diff  -text
