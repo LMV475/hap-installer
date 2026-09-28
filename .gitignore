@@ -1,0 +1,51 @@
+# ===== 构建产物 =====
+picked.hap
+*.hap
+entry/.cxx/
+entry/build/
+build/
+**/build/
+
+# ===== IDE / 工具缓存 =====
+.idea/
+.hvigor/
+graphflow-out/
+.cxx/
+
+# ===== 本机配置（每人不同） =====
+local.properties
+
+# ===== 调试日志 / 截图 =====
+*.hilog
+*.jpeg
+*.png.log
+
+# ===== 第三方官方源码副本（需手动获取，见 README） =====
+# hapsigner 官方源码及其内置第三方依赖
+entry/src/main/cpp/hapsigner/source/
+entry/src/main/cpp/hapsigner/third_party/zlib/source/
+entry/src/main/cpp/hapsigner/third_party/json/source/
+entry/src/main/cpp/hapsigner/third_party/bzip2/source/
+
+# bounds_checking_function 官方源码
+entry/src/main/cpp/third_party/bounds_checking_function/
+
+# hdctools 官方源码及第三方依赖
+entry/src/main/cpp/hdctools/source/
+entry/src/main/cpp/hdctools/third_party/
+
+# openssl 预编译库（多平台静态库，体积大）
+entry/src/main/cpp/third_party/openssl/
+
+# ===== 签名密钥 / 证书（敏感，勿提交） =====
+# 仅排除根目录的 build-profile.json5（含签名密码）；entry/build-profile.json5 不含敏感信息，正常跟踪
+/build-profile.json5
+entry/src/main/resources/rawfile/store/*.p12
+entry/src/main/resources/rawfile/store/*.pem
+entry/src/main/resources/rawfile/store/*.cer
+entry/src/main/resources/rawfile/store/*.p7b
+entry/src/main/resources/rawfile/store/*.csr
+
+# ===== OS 杂项 =====
+.DS_Store
+Thumbs.db

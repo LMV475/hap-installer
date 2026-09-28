@@ -1,0 +1,43 @@
+{
+  "app": {
+    "signingConfigs": [
+      {
+        "name": "default",
+        "type": "HarmonyOS",
+        "material": {
+          // 签名证书路径（本机生成后填写绝对路径）
+          "certpath": "<your-cert.cer>",
+          "keyAlias": "debugKey",
+          // 密钥库密码与 key 密码（通过 DevEco Studio 生成签名时获得，勿硬编码提交）
+          "keyPassword": "<your-key-password>",
+          "profile": "<your-profile.p7b>",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "<your-store.p12>",
+          "storePassword": "<your-store-password>"
+        }
+      }
+    ],
+    "products": [
+      {
+        "name": "default",
+        "signingConfig": "default",
+        "compatibleSdkVersion": "6.0.1(21)",
+        "runtimeOS": "HarmonyOS",
+        "targetSdkVersion": "6.0.1(21)"
+      }
+    ],
+    "buildModeSet": [
+      { "name": "debug" },
+      { "name": "release" }
+    ]
+  },
+  "modules": [
+    {
+      "name": "entry",
+      "srcPath": "./entry",
+      "targets": [
+        { "name": "default", "applyToProducts": ["default"] }
+      ]
+    }
+  ]
+}
