@@ -24,6 +24,7 @@ export const TITLE_BLUR_VP: number = 45;
  */
 export const TITLE_MASK_ALPHA: number[] = [0.9, 0.9, 0.89, 0.87, 0.82, 0.68, 0.5, 0.3, 0.14, 0];
 export const TITLE_MASK_POS: number[] = [0, 0.28, 0.5, 0.65, 0.78, 0.85, 0.9, 0.94, 0.97, 1];
+/** 旧手搓胶囊高度（legacy 设计 token）。与 SYSTEM_TAB_BAR_VP 当前刻意等值（56）但来源独立（此为设计值、彼为系统实测值），允许各自漂移，勿合并 */
 export const PILL_BAR_VP: number = 56;
 export const PILL_BOTTOM_GAP_VP: number = 12;
 export const CONTENT_GAP_VP: number = 24;
@@ -33,6 +34,7 @@ export const PILL_ITEM_PAD_VP: number = 4;
  * 系统悬浮 TabBar 的真实高度（vp）。初值沿用旧胶囊，Task 8 Step 6 用 px2vp 比值实测校正。
  * 实测（5MT0226114015018，uitest dumpLayout TabBar bounds 高 190px，px2vp(1000)=296.296 → 190×0.296296=56.3vp）：
  * barHeight 给多少系统就画多少，56 成立，保留 56。
+ * 与 PILL_BAR_VP 当前刻意等值但来源独立（系统实测 vs legacy 设计 token），Fix round 1 已真机证明 bottomInsetVp 分叉接线有效（56→80 时内容底 inset 精确上移 81px）。
  */
 export const SYSTEM_TAB_BAR_VP: number = 56;
 /**
