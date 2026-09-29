@@ -32,6 +32,7 @@ export function topInsetVp(ui: UIContext, safeTopPx: number): number {
   return ui.px2vp(safeTopPx) + TITLE_TOP_GAP_VP + TITLE_BAR_VP + TITLE_FADE_VP;
 }
 
+// 系统悬浮栏模式下的真实高度由 Batch 3 的 Task 8 量测后在此函数内分叉
 export function bottomInsetVp(ui: UIContext, safeBottomPx: number): number {
   return ui.px2vp(safeBottomPx) + PILL_BAR_VP + PILL_BOTTOM_GAP_VP + CONTENT_GAP_VP;
 }

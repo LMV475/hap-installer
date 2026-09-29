@@ -13,6 +13,7 @@ import { Breakpoint, syncBreakpoint } from '../components/BreakpointSystem';
 import { PILL_BAR_VP, PILL_BOTTOM_GAP_VP, PILL_ITEM_PAD_VP, TITLE_BAR_VP, TITLE_BLUR_VP,
   TITLE_FADE_VP, TITLE_FONT_VP, TITLE_MASK_ALPHA, TITLE_MASK_POS,
   TITLE_TOP_GAP_VP } from '../common/Immersive';
+import { useSystemTabBar, useSystemTitleBar } from '../common/MaterialPolicy';
 
 @Entry
 @Component
@@ -79,7 +80,7 @@ struct Index {
    * 所以不存在分段模糊带的色阶，也永远不会糊到标题文字。
    */
   @Builder
-  topBar() {
+  legacyTopBar() {
     Stack({ alignContent: Alignment.Top }) {
       Column()
         .width('100%')
@@ -121,7 +122,7 @@ struct Index {
 
   /** 底部悬浮胶囊：圆角矩形 + 毛玻璃，浮在页面内容之上 */
   @Builder
-  bottomBar() {
+  legacyBottomBar() {
     Row() {
       this.tabLabel('首页', $r('sys.symbol.house'), 0)
       this.tabLabel('证书', $r('sys.symbol.doc_text'), 1)
@@ -190,26 +191,30 @@ struct Index {
         .linearGradientBlur(TITLE_BLUR_VP,
           { fractionStops: this.blurFractions(), direction: GradientDirection.Bottom })
         .barMode(BarMode.Fixed)
-        .barHeight(0)
+        .barHeight(useSystemTabBar() ? 56 : 0)
         .barBackgroundColor(Color.Transparent)
         .width('100%')
         .height('100%')
 
         Stack({ alignContent: Alignment.Top }) {
-          this.topBar()
+          if (!useSystemTitleBar()) {
+            this.legacyTopBar()
+          }
         }
         .width('100%')
         .height('100%')
         .hitTestBehavior(HitTestMode.None)
 
-        this.bottomBar()
+        if (!useSystemTabBar()) {
+          this.legacyBottomBar()
+        }
       }
       .width('100%')
       .height('100%')
     }
     .navDestination(this.pageMap)
     .mode(NavigationMode.Stack)
-    .hideTitleBar(true)
+    .hideTitleBar(!useSystemTitleBar())
     .width('100%')
     .height('100%')
     .backgroundColor($r('sys.color.ohos_id_color_sub_background'))
