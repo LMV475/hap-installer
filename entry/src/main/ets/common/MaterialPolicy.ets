@@ -52,7 +52,7 @@ export function logMaterialCapabilities(): void {
 /** 回退总开关：false 时全站回到手搓浮层，不做任何材质设置 */
 export const USE_SYSTEM_CHROME: boolean = true;
 /** 底栏交回 Tabs.barFloatingStyle 的分面开关（Batch 3 置 true） */
-export const ENABLE_SYSTEM_TAB_BAR: boolean = false;
+export const ENABLE_SYSTEM_TAB_BAR: boolean = true;
 /** 顶栏交回 Navigation.title 的分面开关（Batch 4 置 true） */
 export const ENABLE_SYSTEM_TITLE_BAR: boolean = false;
 

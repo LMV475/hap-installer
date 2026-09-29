@@ -12,8 +12,9 @@ import { DebugDetail } from './DebugDetail';
 import { Breakpoint, syncBreakpoint } from '../components/BreakpointSystem';
 import { PILL_BAR_VP, PILL_BOTTOM_GAP_VP, PILL_ITEM_PAD_VP, TITLE_BAR_VP, TITLE_BLUR_VP,
   TITLE_FADE_VP, TITLE_FONT_VP, TITLE_MASK_ALPHA, TITLE_MASK_POS,
-  TITLE_TOP_GAP_VP } from '../common/Immersive';
-import { useSystemTabBar, useSystemTitleBar } from '../common/MaterialPolicy';
+  TITLE_TOP_GAP_VP, SYSTEM_TAB_BAR_VP, TAB_BAR_WIDTH_SM_VP, TAB_BAR_WIDTH_MD_VP,
+  TAB_BAR_WIDTH_LG_VP } from '../common/Immersive';
+import { useSystemTabBar, useSystemTitleBar, tabBarMaterial } from '../common/MaterialPolicy';
 
 @Entry
 @Component
@@ -64,8 +65,10 @@ struct Index {
     .layoutWeight(1)
     .height('100%')
     .justifyContent(FlexAlign.Center)
-    .borderRadius(PILL_BAR_VP / 2 - PILL_ITEM_PAD_VP)
-    .backgroundColor(this.selectedTab === idx
+    // 系统悬浮 TabBar 下选中底色/圆角交回系统高亮表达（Task 8 Step 5）；
+    // 回退分支（!useSystemTabBar()，含 USE_SYSTEM_CHROME=false）保留手搓选中态，观感与 Batch 3 前一致
+    .borderRadius(useSystemTabBar() ? 0 : PILL_BAR_VP / 2 - PILL_ITEM_PAD_VP)
+    .backgroundColor(!useSystemTabBar() && this.selectedTab === idx
       ? (this.isDark ? '#26FFFFFF' : '#14000000')
       : Color.Transparent)
     .accessibilityText(text + (this.selectedTab === idx ? '，已选中' : ''))
@@ -171,18 +174,22 @@ struct Index {
           TabContent() {
             Home()
           }
+          .tabBar(this.tabLabel('首页', $r('sys.symbol.house'), 0))
 
           TabContent() {
             Cert()
           }
+          .tabBar(this.tabLabel('证书', $r('sys.symbol.doc_text'), 1))
 
           TabContent() {
             History()
           }
+          .tabBar(this.tabLabel('历史', $r('sys.symbol.clock'), 2))
 
           TabContent() {
             More()
           }
+          .tabBar(this.tabLabel('更多', $r('sys.symbol.ellipsis_circle'), 3))
         }
         .onChange((idx: number): void => { this.selectedTab = idx; })
         .onAreaChange((_oldValue: Area, newValue: Area): void => {
@@ -191,8 +198,22 @@ struct Index {
         .linearGradientBlur(TITLE_BLUR_VP,
           { fractionStops: this.blurFractions(), direction: GradientDirection.Bottom })
         .barMode(BarMode.Fixed)
-        .barHeight(useSystemTabBar() ? 56 : 0)
+        .barHeight(useSystemTabBar() ? SYSTEM_TAB_BAR_VP : 0)
         .barBackgroundColor(Color.Transparent)
+        // barFloatingStyle 仅在页签栏与内容重叠（barOverlap(true)）时生效，与悬浮分支同开同关
+        .barOverlap(useSystemTabBar())
+        .barFloatingStyle(useSystemTabBar() ? {
+          barWidth: {
+            smallBarWidth: TAB_BAR_WIDTH_SM_VP,
+            mediumBarWidth: TAB_BAR_WIDTH_MD_VP,
+            largeBarWidth: TAB_BAR_WIDTH_LG_VP
+          },
+          barBottomMargin: this.getUIContext().px2vp(this.safeBottomPx) + PILL_BOTTOM_GAP_VP,
+          // 真机（5MT0226114015018，直板机）左右手操作下悬浮栏始终居中（bounds 86..1234），未观察到可见偏置；
+          // 单手模式无法经 shell 切换验证，按 Task 8 Step 7③ 置 false 并在 spec 记录
+          adaptToHandedness: false,
+          systemMaterial: tabBarMaterial()
+        } : undefined)
         .width('100%')
         .height('100%')
 

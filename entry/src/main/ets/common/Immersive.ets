@@ -1,3 +1,5 @@
+import { useSystemTabBar } from './MaterialPolicy';
+
 /**
  * 沉浸光感布局的公共尺寸：顶部标题浮层 / 底部悬浮胶囊。
  * 页面内容铺满到状态栏和导航条之下，再由各页自己按这两个 inset 留出可视区。
@@ -27,14 +29,29 @@ export const PILL_BOTTOM_GAP_VP: number = 12;
 export const CONTENT_GAP_VP: number = 24;
 /** 胶囊内边距：选中项圆角 = 外圆角 - 内边距，两圈才同心 */
 export const PILL_ITEM_PAD_VP: number = 4;
+/**
+ * 系统悬浮 TabBar 的真实高度（vp）。初值沿用旧胶囊，Task 8 Step 6 用 px2vp 比值实测校正。
+ * 实测（5MT0226114015018，uitest dumpLayout TabBar bounds 高 190px，px2vp(1000)=296.296 → 190×0.296296=56.3vp）：
+ * barHeight 给多少系统就画多少，56 成立，保留 56。
+ */
+export const SYSTEM_TAB_BAR_VP: number = 56;
+/**
+ * 悬浮 TabBar 在 sm/md/lg 三档断点下的绝对宽度（vp）。百分比不被 FloatingTabBarWidth 支持（tabs.d.ts:783-813）。
+ * sm 档实测（同上设备，屏宽 391vp 落在 sm）：TabBar bounds 宽 1148px×0.296296=340.1vp，340 原样生效；
+ * md/lg 档该直板机无法呈现，仅代码证据。
+ */
+export const TAB_BAR_WIDTH_SM_VP: number = 340;
+export const TAB_BAR_WIDTH_MD_VP: number = 560;
+export const TAB_BAR_WIDTH_LG_VP: number = 720;
 
 export function topInsetVp(ui: UIContext, safeTopPx: number): number {
   return ui.px2vp(safeTopPx) + TITLE_TOP_GAP_VP + TITLE_BAR_VP + TITLE_FADE_VP;
 }
 
-// 系统悬浮栏模式下的真实高度由 Batch 3 的 Task 8 量测后在此函数内分叉
+// 系统悬浮 TabBar 模式下用实测高度分叉（Task 8）；依赖方向为常量层(Immersive) → 策略层(MaterialPolicy)，禁止反向 import
 export function bottomInsetVp(ui: UIContext, safeBottomPx: number): number {
-  return ui.px2vp(safeBottomPx) + PILL_BAR_VP + PILL_BOTTOM_GAP_VP + CONTENT_GAP_VP;
+  const barVp: number = useSystemTabBar() ? SYSTEM_TAB_BAR_VP : PILL_BAR_VP;
+  return ui.px2vp(safeBottomPx) + barVp + PILL_BOTTOM_GAP_VP + CONTENT_GAP_VP;
 }
 
 /** NavDestination 子页用系统标题栏，需要自己把状态栏 / 导航条区域让出来 */
