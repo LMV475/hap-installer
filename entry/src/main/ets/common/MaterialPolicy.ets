@@ -94,3 +94,12 @@ export function titleBarMaterial(): uiMaterial.ImmersiveMaterial {
   };
   return new uiMaterial.ImmersiveMaterial(options);
 }
+
+/** 半模态抽屉材质：detent 抽屉比浮层更需要薄档，避免遮挡内容透色过度 */
+export function sheetMaterial(): uiMaterial.ImmersiveMaterial {
+  const options: uiMaterial.ImmersiveOptions = {
+    style: uiMaterial.ImmersiveStyle.REGULAR,
+    applyShadow: false
+  };
+  return new uiMaterial.ImmersiveMaterial(options);
+}

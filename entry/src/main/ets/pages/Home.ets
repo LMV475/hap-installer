@@ -19,6 +19,7 @@ import { addHistoryTarget } from '../common/HistoryTargets';
 import { HapPeek } from '../common/HapPeek';
 import { getSecret, putSecret } from '../common/SecureStore';
 import { topInsetVp, bottomInsetVp } from '../common/Immersive';
+import { sheetMaterial } from '../common/MaterialPolicy';
 import { worker, MessageEvents, ErrorEvent, util } from '@kit.ArkTS';
 
 const SELF_BUNDLE: string = 'cn.lxh.hapinstaller';
@@ -1959,7 +1960,7 @@ export struct Home {
       .bindSheet($$this.connectSheetOpen, this.connectSheetBuilder(), {
         detents: [SheetSize.MEDIUM, SheetSize.LARGE],
         title: { title: '无线调试' },
-        backgroundColor: $r('sys.color.ohos_id_color_card_bg')
+        systemMaterial: sheetMaterial()
       })
 
       Text(this.status)
@@ -1990,7 +1991,7 @@ export struct Home {
     .bindSheet($$this.signSheetOpen, this.signConfigSheet(), {
       detents: [SheetSize.LARGE],
       title: { title: '签名配置' },
-      backgroundColor: $r('sys.color.ohos_id_color_card_bg')
+      systemMaterial: sheetMaterial()
     })
   }
 
