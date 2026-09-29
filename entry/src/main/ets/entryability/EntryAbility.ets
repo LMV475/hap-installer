@@ -3,6 +3,7 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
 import { fileIo } from '@kit.CoreFileKit';
 import { preferences } from '@kit.ArkData';
+import { logMaterialCapabilities } from '../common/MaterialPolicy';
 
 export default class EntryAbility extends UIAbility {
   private mainWin: window.Window | null = null;
@@ -158,6 +159,7 @@ export default class EntryAbility extends UIAbility {
         hilog.error(0x0000, 'HapInstaller', 'loadContent failed: %{public}s', JSON.stringify(err));
       }
       this.setupImmersiveWindow(windowStage);
+      logMaterialCapabilities();
     });
   }
 
