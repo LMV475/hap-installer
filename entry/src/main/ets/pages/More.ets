@@ -8,6 +8,7 @@ import { http } from '@kit.NetworkKit';
 import { HapCard } from '../components/HapCard';
 import { PillButton } from '../components/PillButton';
 import { topInsetVp, bottomInsetVp } from '../common/Immersive';
+import { dialogMaterial } from '../common/MaterialPolicy';
 
 const PROJECT_REPO: string = 'https://github.com/LMV475/hap-installer';
 const RELEASE_API: string = 'https://api.github.com/repos/LMV475/hap-installer/releases/latest';
@@ -168,7 +169,8 @@ export struct More {
           buttons: [
             { text: '前往下载', color: '#0A59F7' },
             { text: '稍后', color: '#666666' }
-          ]
+          ],
+          systemMaterial: dialogMaterial()
         }).then((res: promptAction.ShowDialogSuccessResponse): void => {
           if (res.index === 0) {
             const want: Want = {
@@ -248,7 +250,8 @@ export struct More {
     promptAction.showDialog({
       title: '应用目录',
       message: 'filesDir: ' + c.filesDir + '\ntempDir: ' + c.tempDir + '\ncacheDir: ' + c.cacheDir,
-      buttons: [{ text: '复制 filesDir', color: '#0A59F7' }, { text: '关闭', color: '#666666' }]
+      buttons: [{ text: '复制 filesDir', color: '#0A59F7' }, { text: '关闭', color: '#666666' }],
+      systemMaterial: dialogMaterial()
     }).then((res: promptAction.ShowDialogSuccessResponse): void => {
       if (res.index === 0) {
         this.tipText = '已显示 filesDir 路径';
@@ -260,7 +263,8 @@ export struct More {
     promptAction.showDialog({
       title: '清空数据',
       message: '将删除 preferences 中的证书/目标/登录态记录，签名产物保留。确认继续？',
-      buttons: [{ text: '清空', color: '#D9534F' }, { text: '取消', color: '#666666' }]
+      buttons: [{ text: '清空', color: '#D9534F' }, { text: '取消', color: '#666666' }],
+      systemMaterial: dialogMaterial()
     }).then((res: promptAction.ShowDialogSuccessResponse): void => {
       if (res.index === 0) {
         this.doClear(false);
@@ -272,7 +276,8 @@ export struct More {
     promptAction.showDialog({
       title: '重置签名配置',
       message: '仅清除证书链 / Profile / 密钥库路径。确认继续？',
-      buttons: [{ text: '重置', color: '#D9534F' }, { text: '取消', color: '#666666' }]
+      buttons: [{ text: '重置', color: '#D9534F' }, { text: '取消', color: '#666666' }],
+      systemMaterial: dialogMaterial()
     }).then((res: promptAction.ShowDialogSuccessResponse): void => {
       if (res.index === 0) {
         this.doClear(true);
@@ -302,7 +307,8 @@ export struct More {
     promptAction.showDialog({
       title: '温馨提示',
       message: '① 端侧签名仅用于自用 / 企业分发\n② 只能装华为 CA 链签名的包\n③ 装机后本应用会被替换并自动重启',
-      buttons: [{ text: '知道了', color: '#0A59F7' }]
+      buttons: [{ text: '知道了', color: '#0A59F7' }],
+      systemMaterial: dialogMaterial()
     }).catch((): void => {});
   }
 

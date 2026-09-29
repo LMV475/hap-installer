@@ -103,3 +103,12 @@ export function sheetMaterial(): uiMaterial.ImmersiveMaterial {
   };
   return new uiMaterial.ImmersiveMaterial(options);
 }
+
+/** 确认弹窗材质：实测 state=DEFAULT 下 showDialog 不自动获得材质，需显式设置；浮层用厚档保文字对比度 */
+export function dialogMaterial(): uiMaterial.ImmersiveMaterial {
+  const options: uiMaterial.ImmersiveOptions = {
+    style: uiMaterial.ImmersiveStyle.THICK,
+    applyShadow: false
+  };
+  return new uiMaterial.ImmersiveMaterial(options);
+}

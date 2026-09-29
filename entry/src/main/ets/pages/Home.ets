@@ -19,7 +19,7 @@ import { addHistoryTarget } from '../common/HistoryTargets';
 import { HapPeek } from '../common/HapPeek';
 import { getSecret, putSecret } from '../common/SecureStore';
 import { topInsetVp, bottomInsetVp } from '../common/Immersive';
-import { sheetMaterial } from '../common/MaterialPolicy';
+import { sheetMaterial, dialogMaterial } from '../common/MaterialPolicy';
 import { worker, MessageEvents, ErrorEvent, util } from '@kit.ArkTS';
 
 const SELF_BUNDLE: string = 'cn.lxh.hapinstaller';
@@ -1535,7 +1535,8 @@ export struct Home {
         buttons: [
           { text: '继续安装', color: '#0A59F7' },
           { text: '取消', color: '#666666' }
-        ]
+        ],
+        systemMaterial: dialogMaterial()
       };
       const res: promptAction.ShowDialogSuccessResponse = await promptAction.showDialog(opts);
       return res.index === 0;
