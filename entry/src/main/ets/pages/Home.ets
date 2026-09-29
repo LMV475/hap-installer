@@ -19,7 +19,7 @@ import { addHistoryTarget } from '../common/HistoryTargets';
 import { HapPeek } from '../common/HapPeek';
 import { getSecret, putSecret } from '../common/SecureStore';
 import { topInsetVp, bottomInsetVp } from '../common/Immersive';
-import { sheetMaterial, dialogMaterial } from '../common/MaterialPolicy';
+import { sheetMaterial, dialogMaterial, useSystemChrome } from '../common/MaterialPolicy';
 import { worker, MessageEvents, ErrorEvent, util } from '@kit.ArkTS';
 
 const SELF_BUNDLE: string = 'cn.lxh.hapinstaller';
@@ -1536,7 +1536,7 @@ export struct Home {
           { text: '继续安装', color: '#0A59F7' },
           { text: '取消', color: '#666666' }
         ],
-        systemMaterial: dialogMaterial()
+        systemMaterial: useSystemChrome() ? dialogMaterial() : undefined
       };
       const res: promptAction.ShowDialogSuccessResponse = await promptAction.showDialog(opts);
       return res.index === 0;
@@ -1961,7 +1961,8 @@ export struct Home {
       .bindSheet($$this.connectSheetOpen, this.connectSheetBuilder(), {
         detents: [SheetSize.MEDIUM, SheetSize.LARGE],
         title: { title: '无线调试' },
-        systemMaterial: sheetMaterial()
+        systemMaterial: useSystemChrome() ? sheetMaterial() : undefined,
+        backgroundColor: useSystemChrome() ? Color.Transparent : $r('sys.color.ohos_id_color_card_bg')
       })
 
       Text(this.status)
@@ -1992,7 +1993,8 @@ export struct Home {
     .bindSheet($$this.signSheetOpen, this.signConfigSheet(), {
       detents: [SheetSize.LARGE],
       title: { title: '签名配置' },
-      systemMaterial: sheetMaterial()
+      systemMaterial: useSystemChrome() ? sheetMaterial() : undefined,
+      backgroundColor: useSystemChrome() ? Color.Transparent : $r('sys.color.ohos_id_color_card_bg')
     })
   }
 

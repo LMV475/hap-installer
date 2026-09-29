@@ -9,7 +9,7 @@ import { HapCard } from '../components/HapCard';
 import { PillButton } from '../components/PillButton';
 import { HomeSettingItem } from '../components/HomeSettingItem';
 import { topInsetVp, bottomInsetVp } from '../common/Immersive';
-import { dialogMaterial } from '../common/MaterialPolicy';
+import { dialogMaterial, useSystemChrome } from '../common/MaterialPolicy';
 
 @Component
 export struct Cert {
@@ -144,7 +144,7 @@ export struct Cert {
         { text: '删除', color: '#D9534F' },
         { text: '取消', color: '#666666' }
       ],
-      systemMaterial: dialogMaterial()
+      systemMaterial: useSystemChrome() ? dialogMaterial() : undefined
     }).then((res: promptAction.ShowDialogSuccessResponse): void => {
       if (res.index === 0) {
         this.deleteCert(c);
