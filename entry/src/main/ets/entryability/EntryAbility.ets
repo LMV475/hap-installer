@@ -33,6 +33,8 @@ export default class EntryAbility extends UIAbility {
     } catch (e) {
       hilog.error(0x0000, 'HapInstaller', '%{public}s', 'read want params failed');
     }
+    // 文件管理器/其他应用以"打开方式"传入安装包：把文件复制进沙盒，留给首页加载
+    this.ingestExternalHap(want);
     this.restoreTheme();
     this.appendLifecycle('start', 'launchReason=' + launchParam.launchReason);
   }
@@ -40,6 +42,8 @@ export default class EntryAbility extends UIAbility {
   /** 浏览器授权页回跳（hapinstaller://）时被系统拉起：确保回到首页 */
   onNewWant(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     hilog.info(0x0000, 'HapInstaller', '%{public}s', '[ability] onNewWant uri=' + (want.uri ?? ''));
+    // 从文件管理器再次"打开方式"传文件时，也复制进沙盒供首页刷新
+    this.ingestExternalHap(want);
     AppStorage.setOrCreate<number>('selectedTab', 0);
     this.appendLifecycle('foreground', 'reentry uri=' + (want.uri ?? ''));
   }
@@ -69,6 +73,43 @@ export default class EntryAbility extends UIAbility {
     const v: Object | undefined = params[key];
     if (v !== undefined) {
       AppStorage.setOrCreate<string>(key, v.toString());
+    }
+  }
+
+  /**
+   * 文件管理器/其他应用以"打开方式"传入安装包文件时：
+   * want.uri 形如 file://.../xxx.hap，系统已临时授权读取权限。
+   * 把它复制进沙盒 tempDir/picked.hap，再通过 AppStorage('lastPickedHap') 交给首页显示。
+   * 复制后原 URI 的临时权限即失效，沙盒副本可长期访问。
+   */
+  private ingestExternalHap(want: Want): void {
+    const uri: string | undefined = want.uri;
+    if (uri === undefined || uri.length === 0) {
+      return;
+    }
+    // 只处理 file:// 且扩展名为 .hap/.hsp/.app 的 URI，避免误吞 hapinstaller:// 回跳
+    if (!uri.startsWith('file://')) {
+      return;
+    }
+    const lower: string = uri.toLowerCase();
+    if (!lower.endsWith('.hap') && !lower.endsWith('.hsp') && !lower.endsWith('.app')) {
+      return;
+    }
+    try {
+      const dst: string = this.context.tempDir + '/picked.hap';
+      const inFile = fileIo.openSync(uri, fileIo.OpenMode.READ_ONLY);
+      const outFile = fileIo.openSync(dst,
+        fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE | fileIo.OpenMode.TRUNC);
+      fileIo.copyFileSync(inFile.fd, outFile.fd);
+      fileIo.closeSync(inFile);
+      fileIo.closeSync(outFile);
+      // 用路径 + 递增序号双写：路径供 aboutToAppear 单次消费，序号供在前台时 @Watch 触发刷新
+      const seq: number = (AppStorage.get<number>('lastPickedHapSeq') ?? 0) + 1;
+      AppStorage.setOrCreate<string>('lastPickedHap', dst);
+      AppStorage.setOrCreate<number>('lastPickedHapSeq', seq);
+      hilog.info(0x0000, 'HapInstaller', '%{public}s', '[ability] 外部安装包已导入: ' + dst);
+    } catch (e) {
+      hilog.error(0x0000, 'HapInstaller', '%{public}s', '[ability] 导入外部安装包失败: ' + (e as Error).message);
     }
   }
 

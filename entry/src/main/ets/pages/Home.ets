@@ -55,6 +55,7 @@ export struct Home {
   @State ipPart: string = '127.0.0.1';
   @State portPart: string = '';
   @StorageLink('signSheetRequest') @Watch('onSignSheetRequest') signSheetRequest: number = 0;
+  @StorageLink('lastPickedHapSeq') @Watch('onExternalHap') lastPickedHapSeq: number = 0;
   @StorageLink('safeTopPx') safeTopPx: number = 0;
   @StorageLink('safeBottomPx') safeBottomPx: number = 0;
   private kernelReady: boolean = false;
@@ -82,6 +83,7 @@ export struct Home {
       this.runAutoParams();
     }
     this.collectWebDownload();
+    this.collectExternalHap();
   }
 
   private async bootstrapStore(): Promise<void> {
@@ -388,6 +390,25 @@ export struct Home {
     this.matLabel = '证书材料 ' + ready + '/3 已选（含网页下载）';
     this.log('网页下载材料已导入: ' + path);
     this.saveConfig();
+  }
+
+  /**
+   * 从文件管理器/其他应用以"打开方式"带入的安装包：
+   * EntryAbility 已把外部文件复制进沙盒 tempDir/picked.hap，这里取出并显示。
+   * 与 collectWebDownload 同样的 AppStorage 单次消费模式。
+   * 即使华为账号未登录也照常显示——用户就是冲着"装这个包"来的。
+   */
+  private collectExternalHap(): void {
+    const path: string | undefined = AppStorage.get<string>('lastPickedHap');
+    if (path === undefined || path.length === 0) {
+      return;
+    }
+    AppStorage.setOrCreate<string>('lastPickedHap', '');
+    if (!fileIo.accessSync(path)) {
+      return;
+    }
+    this.markPicked(path);
+    this.log('[外部导入] 安装包已载入: ' + path);
   }
 
   private async saveConfig(): Promise<void> {
@@ -1466,6 +1487,13 @@ export struct Home {
     }
   }
 
+  /** 在前台时收到新的外部安装包导入（onNewWant 场景）：刷新已选包 */
+  onExternalHap(): void {
+    if (this.lastPickedHapSeq > 0) {
+      this.collectExternalHap();
+    }
+  }
+
   private async execTimeout(cmd: string, ms: number): Promise<string> {
     const timeout: Promise<string> = new Promise<string>((resolve: (v: string) => void): void => {
       setTimeout((): void => { resolve(''); }, ms);
@@ -1841,6 +1869,7 @@ export struct Home {
   }
 
   private canStartDebug(): boolean {
+    // 调试/安装按钮只在"华为账号已登录 + 无线调试已连接 + 安装包已选择"三者齐备时才显示
     return this.agcUser.length > 0 && this.target.length > 0 && this.hapPath.length > 0;
   }
 
@@ -1890,8 +1919,10 @@ export struct Home {
           buttonEnabled: !this.busy,
           onButtonTap: (): void => { this.doLogin(); }
         })
+        // 下面任一行可见时才需要这条分隔线：设备行（已登录）或安装包行（有包即可，含外部带入）
         Divider().color($r('sys.color.ohos_id_color_list_separator'))
-          .visibility(this.agcUser.length > 0 ? Visibility.Visible : Visibility.None)
+          .visibility(this.agcUser.length > 0 || this.hapPath.length > 0
+            ? Visibility.Visible : Visibility.None)
         HomeSettingItem({
           title: this.target.length > 0 ? this.target : '未连接',
           description: '设备',
@@ -1903,7 +1934,7 @@ export struct Home {
           onButtonTap: (): void => { this.openConnectSheet(); }
         })
         Divider().color($r('sys.color.ohos_id_color_list_separator'))
-          .visibility(this.agcUser.length > 0 && this.target.length > 0
+          .visibility(this.agcUser.length > 0
             ? Visibility.Visible : Visibility.None)
         HomeSettingItem({
           title: this.hapPath.length > 0 ? this.hapLabel : '未选择',
@@ -1912,7 +1943,9 @@ export struct Home {
           buttonLabel: this.hapPath.length > 0 ? '更换' : '选择',
           isActive: this.hapPath.length > 0,
           buttonEnabled: !this.busy,
-          show: this.agcUser.length > 0 && this.target.length > 0,
+          // 有已选包（含外部"打开方式"带入）时无论登录/连接与否都显示，让用户看到刚选的文件；
+          // 无包时仍按原流程隐藏，等登录+连接后才露出"选择"入口
+          show: this.hapPath.length > 0 || (this.agcUser.length > 0 && this.target.length > 0),
           onButtonTap: (): void => { this.doPick(); }
         })
       }

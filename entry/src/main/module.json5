@@ -21,7 +21,18 @@
         "skills": [
           { "entities": ["entity.system.home"], "actions": ["action.system.home"] },
           { "actions": ["ohos.want.action.viewData"], "entities": ["entity.system.browsable"],
-            "uris": [{ "scheme": "hapinstaller" }] }
+            "uris": [{ "scheme": "hapinstaller" }] },
+          {
+            // 文件管理器/其他应用"打开方式"能力：声明可处理 .hap/.hsp/.app 三种鸿蒙安装包。
+            // type 必须用 UTD 类型（见 UTD 预置列表：openharmony.hap/.hsp/.app），
+            // 且 linkFeature 必填、大小写敏感，缺了不会出现在"打开方式"列表里。
+            "actions": ["ohos.want.action.viewData"],
+            "uris": [
+              { "scheme": "file", "type": "openharmony.hap", "linkFeature": "FileOpen" },
+              { "scheme": "file", "type": "openharmony.hsp", "linkFeature": "FileOpen" },
+              { "scheme": "file", "type": "openharmony.app", "linkFeature": "FileOpen" }
+            ]
+          }
         ]
       }
     ],
