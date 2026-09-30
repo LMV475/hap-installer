@@ -57,13 +57,18 @@ export default class EntryAbility extends UIAbility {
     this.appendLifecycle('start', 'launchReason=' + launchParam.launchReason);
   }
 
-  /** 浏览器授权页回跳（hapinstaller://）时被系统拉起：确保回到首页 */
+  /** 浏览器授权页回跳（hapinstaller://）时被系统拉起：不切换 Tab，让页面自行同步状态 */
   onNewWant(want: Want, launchParam: AbilityConstant.LaunchParam): void {
-    hilog.info(0x0000, 'HapInstaller', '%{public}s', '[ability] onNewWant uri=' + (want.uri ?? ''));
+    const uri: string = want.uri ?? '';
+    hilog.info(0x0000, 'HapInstaller', '%{public}s', '[ability] onNewWant uri=' + uri);
     // 从文件管理器再次"打开方式"传文件时，也复制进沙盒供首页刷新
     this.ingestExternalHap(want);
-    AppStorage.setOrCreate<number>('selectedTab', 0);
-    this.appendLifecycle('foreground', 'reentry uri=' + (want.uri ?? ''));
+    // 仅在非 hapinstaller:// 协议（即外部文件传入）时强制回首页；
+    // 浏览器授权回调（hapinstaller://login-ok）保持当前 Tab，由 @StorageLink 同步登录态。
+    if (uri.length === 0 || !uri.startsWith('hapinstaller://')) {
+      AppStorage.setOrCreate<number>('selectedTab', 0);
+    }
+    this.appendLifecycle('foreground', 'reentry uri=' + uri);
   }
 
   onDestroy(): void {

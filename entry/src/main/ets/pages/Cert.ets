@@ -5,12 +5,15 @@ import { promptAction } from '@kit.ArkUI';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { preferences } from '@kit.ArkData';
 import { hilog } from '@kit.PerformanceAnalysisKit';
-import { AgcService, AgcCertInfo } from '../common/AgcService';
+import { AgcService, AgcCertInfo, AgcAuthInfo } from '../common/AgcService';
 import { HapCard } from '../components/HapCard';
 import { PillButton } from '../components/PillButton';
 import { HomeSettingItem } from '../components/HomeSettingItem';
 import { topInsetVp, bottomInsetVp, barBottomVp, REFRESH_INDICATOR_VP } from '../common/Immersive';
 import { dialogMaterial, useSystemChrome } from '../common/MaterialPolicy';
+import { putSecret } from '../common/SecureStore';
+
+const AGC_AUTH_ALIAS: string = 'hapinstaller_agc_auth';
 
 @Component
 export struct Cert {
@@ -24,9 +27,13 @@ export struct Cert {
   @State pullOffsetVp: number = 0;
   @State tipText: string = '';
   @State currentName: string = '';
+  @State busy: boolean = false;
   // 监听首页登录态变化（agcUser 改变说明刚登录/更换账号）
   @StorageLink('agcUser') @Watch('onAgcUserChanged') agcUser: string = '';
+  // 监听 Tab 切换，当切换到证书页时检查登录状态
+  @StorageLink('selectedTab') @Watch('onTabChanged') selectedTab: number = 0;
   private lastAgcUser: string = '';
+  private lastCheckedTab: number = -1;
 
   aboutToAppear(): void {
     this.lastAgcUser = this.agcUser;
@@ -36,12 +43,34 @@ export struct Cert {
   }
 
   onPageShow(): void {
-    // 从其他页面返回时，如果 agcUser 发生变化（刚登录/更换账号），重新加载证书列表
-    hilog.info(0x0000, 'Cert', '[cert] onPageShow: agcUser=%{public}s, lastAgcUser=%{public}s, changed=%{public}b',
-      this.agcUser, this.lastAgcUser, this.agcUser !== this.lastAgcUser);
-    if (this.agcUser !== this.lastAgcUser) {
+    // 从其他页面返回时，检查登录状态并刷新证书列表
+    const isLoggedIn = AgcService.isLoggedIn();
+    const auth = AgcService.getAuth();
+    
+    hilog.info(0x0000, 'Cert', '[cert] onPageShow 开始检查');
+    hilog.info(0x0000, 'Cert', '[cert]   agcUser=%{public}s', this.agcUser);
+    hilog.info(0x0000, 'Cert', '[cert]   lastAgcUser=%{public}s', this.lastAgcUser);
+    hilog.info(0x0000, 'Cert', '[cert]   isLoggedIn=%{public}b', isLoggedIn);
+    hilog.info(0x0000, 'Cert', '[cert]   authIsNull=%{public}b', auth === null);
+    if (auth !== null) {
+      hilog.info(0x0000, 'Cert', '[cert]   auth.userId=%{public}s', auth.userId);
+    }
+    hilog.info(0x0000, 'Cert', '[cert]   certs.length=%{public}d', this.certs.length);
+    
+    // 如果已登录但证书列表为空，或者 agcUser 发生变化，则刷新
+    if (isLoggedIn && (this.certs.length === 0 || this.agcUser !== this.lastAgcUser)) {
+      hilog.info(0x0000, 'Cert', '[cert] 触发刷新：条件满足');
       this.lastAgcUser = this.agcUser;
       this.refresh();
+    } 
+    // 如果未登录但之前显示过证书，清空列表
+    else if (!isLoggedIn && this.certs.length > 0) {
+      hilog.info(0x0000, 'Cert', '[cert] 清空证书：未登录但有证书');
+      this.certs = [];
+      this.lastAgcUser = '';
+    } else {
+      hilog.info(0x0000, 'Cert', '[cert] 不刷新：isLoggedIn=%{public}b, certs.length=%{public}d, agcUser==lastAgcUser=%{public}b',
+        isLoggedIn, this.certs.length, this.agcUser === this.lastAgcUser);
     }
   }
 
@@ -55,6 +84,42 @@ export struct Cert {
     }
   }
 
+  onTabChanged(): void {
+    // 当切换到证书页（tab 1）时，检查登录状态并刷新
+    if (this.selectedTab === 1 && this.lastCheckedTab !== 1) {
+      hilog.info(0x0000, 'Cert', '[cert] onTabChanged: 切换到证书页');
+      this.lastCheckedTab = 1;
+      
+      const isLoggedIn = AgcService.isLoggedIn();
+      const auth = AgcService.getAuth();
+      
+      hilog.info(0x0000, 'Cert', '[cert]   agcUser=' + this.agcUser);
+      hilog.info(0x0000, 'Cert', '[cert]   isLoggedIn=' + isLoggedIn);
+      hilog.info(0x0000, 'Cert', '[cert]   authIsNull=' + (auth === null));
+      if (auth !== null) {
+        hilog.info(0x0000, 'Cert', '[cert]   auth.userId=' + auth.userId);
+      }
+      hilog.info(0x0000, 'Cert', '[cert]   certs.length=' + this.certs.length);
+      
+      // 如果已登录但证书列表为空，或者 agcUser 发生变化，则刷新
+      if (isLoggedIn && (this.certs.length === 0 || this.agcUser !== this.lastAgcUser)) {
+        hilog.info(0x0000, 'Cert', '[cert] 触发刷新：条件满足');
+        this.lastAgcUser = this.agcUser;
+        this.refresh();
+      } 
+      // 如果未登录但之前显示过证书，清空列表
+      else if (!isLoggedIn && this.certs.length > 0) {
+        hilog.info(0x0000, 'Cert', '[cert] 清空证书：未登录但有证书');
+        this.certs = [];
+        this.lastAgcUser = '';
+      } else {
+        hilog.info(0x0000, 'Cert', '[cert] 不刷新：isLoggedIn=' + isLoggedIn + ', certs.length=' + this.certs.length);
+      }
+    } else if (this.selectedTab !== 1) {
+      this.lastCheckedTab = this.selectedTab;
+    }
+  }
+
   private ctx(): common.UIAbilityContext {
     return this.getUIContext().getHostContext() as common.UIAbilityContext;
   }
@@ -65,9 +130,11 @@ export struct Cert {
   }
 
   private async refresh(): Promise<void> {
-    hilog.info(0x0000, 'Cert', '[cert] refresh: isLoggedIn=%{public}b, loading=%{public}b, isRefreshing=%{public}b',
+    hilog.info(0x0000, 'Cert', '[cert] refresh 开始: isLoggedIn=%{public}b, loading=%{public}b, isRefreshing=%{public}b',
       AgcService.isLoggedIn(), this.loading, this.isRefreshing);
+    
     if (!AgcService.isLoggedIn()) {
+      hilog.info(0x0000, 'Cert', '[cert] 未登录，清空证书列表');
       this.certs = [];
       this.finishRefresh();
       hilog.info(0x0000, 'Cert', '[cert] refresh: not logged in, cleared certs');
@@ -194,9 +261,64 @@ export struct Cert {
     });
   }
 
-  private goLogin(): void {
-    AppStorage.setOrCreate<number>('selectedTab', 0);
-    this.getUIContext().getPromptAction().showToast({ message: '请在首页点击登录账号' });
+  private async goLogin(): Promise<void> {
+    if (this.busy) {
+      return;
+    }
+    this.busy = true;
+    this.tipText = '等待浏览器完成登录…';
+    
+    const port: number = 3333 + Math.floor(Math.random() * 1000);
+    try {
+      const waiting: Promise<string> = AgcService.waitForCallback(port, 180000);
+      await AgcService.openLoginPage(this.ctx(), port);
+      this.tipText = '已打开授权页（端口 ' + port + '），请在浏览器中登录';
+      
+      const tempToken: string = await waiting;
+      if (tempToken.length === 0) {
+        this.tipText = '未收到回调（超时或已取消）';
+        this.busy = false;
+        return;
+      }
+      
+      const auth = await AgcService.exchangeToken(tempToken);
+      
+      // 持久化保存登录态到 SecureStore
+      const saved = await this.saveAuthToSecureStore(auth);
+      if (!saved) {
+        this.tipText = '登录成功但保存失败，重启后需重新登录';
+      }
+      
+      // 同步到 AppStorage
+      AppStorage.setOrCreate<string>('agcUser', auth.userId);
+      hilog.info(0x0000, 'Cert', '[cert] 登录成功 agcUser=%{public}s', auth.userId);
+      
+      this.tipText = '登录成功：' + auth.userId;
+      // 触发刷新证书列表
+      this.lastAgcUser = auth.userId;
+      await this.refresh();
+    } catch (e) {
+      const err = e as BusinessError;
+      this.tipText = '登录失败: ' + err.message;
+    }
+    this.busy = false;
+  }
+
+  /** 打包登录态为单行字符串（同 Home.packAuth 语义） */
+  private packAuth(auth: AgcAuthInfo): string {
+    return auth.jwtToken + '\n' + auth.accessToken + '\n' + auth.userId + '\n' + auth.teamId;
+  }
+
+  /** 将登录态保存到 SecureStore（加密存储） */
+  private async saveAuthToSecureStore(auth: AgcAuthInfo): Promise<boolean> {
+    try {
+      const blob = this.packAuth(auth);
+      return await putSecret(AGC_AUTH_ALIAS, blob);
+    } catch (e) {
+      const err = e as BusinessError;
+      hilog.error(0x0000, 'Cert', '[cert] 保存登录态失败: %{public}s', err.message);
+      return false;
+    }
   }
 
   /** 指示器居中在「栏底—列表首行」之间：中点 = 栏底 + (静止间距 + 下拉距离) / 2，再减去自身半径 */
@@ -250,7 +372,7 @@ export struct Cert {
         Column({ space: 12 }) {
           HapCard({ content: (): void => { this.tipBody() } })
 
-          if (!AgcService.isLoggedIn()) {
+          if (this.agcUser.length === 0) {
             HapCard({ content: (): void => { this.loginPrompt() } })
           } else if (this.loading) {
             Text('加载中…').fontSize(13)
