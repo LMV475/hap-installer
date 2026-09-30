@@ -75,7 +75,7 @@ export struct UserGuide {
   }
 
   @Builder
-  stepHeader(num: string, title: string, bgColor: Resource) {
+  stepHeader(num: string, title: string, bgColor: ResourceColor) {
     Row({ space: 10 }) {
       Text(num)
         .fontSize(14)
@@ -223,7 +223,7 @@ export struct UserGuide {
       this.stepHeader('4', '调试安装 / 已签名安装', $r('sys.color.ohos_id_color_emphasize'))
       this.stepContent('前三步完成后，页面底部会出现两个安装按钮：')
 
-      this.stepHeader('4a', '开始调试（自动签名）', $r('sys.color.ohos_id_color_success'))
+      this.stepHeader('4a', '开始调试（自动签名）', '#34C759')
       this.demoButton('开始调试（自动签名）', $r('sys.color.ohos_id_color_emphasize'))
       this.stepContent('点击此按钮，应用会自动完成签名并安装到设备。适合需要调试的未签名 HAP 包。')
       Column({ space: 4 }) {
@@ -247,7 +247,7 @@ export struct UserGuide {
 
       this.divider()
 
-      this.stepHeader('4b', '直接安装（需已签名）', $r('sys.color.ohos_id_color_warn'))
+      this.stepHeader('4b', '直接安装（需已签名）', '#FF9500')
       this.demoButton('直接安装（需已签名）', $r('sys.color.ohos_id_color_text_tertiary'))
       this.stepContent('点击此按钮，应用会跳过签名步骤，直接将已签名的 HAP 安装到设备。适合已有有效签名的安装包。')
       Column({ space: 4 }) {
