@@ -38,7 +38,8 @@ export struct UserGuide {
         }
         .width('100%')
         .padding({ left: $r('sys.float.padding_level6'), right: $r('sys.float.padding_level6'),
-          top: barBottomVp(this.getUIContext(), this.safeTopPx),
+          // barBottomVp 让满标题栏底；额外 +16vp 把 HapCard 推入 GRADIENT_BLUR 模糊带渐隐段
+          top: barBottomVp(this.getUIContext(), this.safeTopPx) + 16,
           bottom: $r('sys.float.padding_level6') })
         .alignItems(HorizontalAlign.Start)
       }
