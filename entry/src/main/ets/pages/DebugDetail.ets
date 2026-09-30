@@ -5,12 +5,15 @@ import { FrameCallback } from '@kit.ArkUI';
 import { HistoryRow } from '../common/Store';
 import { HapCard } from '../components/HapCard';
 import { PillButton } from '../components/PillButton';
-import { safeAreaInsets } from '../common/Immersive';
+import { HdsNavDestination, TitleSize } from '@kit.UIDesignKit';
+import { subPageBottom, barBottomVp } from '../common/Immersive';
+import { hdsTitleBarOptions } from '../common/MaterialPolicy';
 
 /** 调试详情页（对应 Flutter debug_detail_page.dart）：单次调试的元信息 + 完整日志 */
 @Component
 export struct DebugDetail {
   @Consume('navStack') pathStack: NavPathStack;
+  @StorageLink('isDark') isDark: boolean = false;
   @StorageLink('safeTopPx') safeTopPx: number = 0;
   @StorageLink('safeBottomPx') safeBottomPx: number = 0;
   @State row: HistoryRow | undefined = undefined;
@@ -79,7 +82,7 @@ export struct DebugDetail {
   }
 
   build() {
-    NavDestination() {
+    HdsNavDestination() {
       Column({ space: 12 }) {
         HapCard({ title: '任务信息', content: (): void => { this.metaBody() } })
 
@@ -109,17 +112,24 @@ export struct DebugDetail {
         .width('100%')
         .layoutWeight(1)
         .padding(12)
-        .scrollBar(BarState.Auto)
-        .backgroundColor(Color.Black)
+        // 回弹对齐首页 Scroll；List 默认只在内容超一屏时回弹，所以要显式 alwaysEnabled
+        .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
+        .scrollBar(BarState.Off)
+        // 底色按主题分档：深色下页底实测纯 0，硬编码 Color.Black 会让日志卡与页底糊成一片 →
+        // 深色用与上方 HapCard 同一张卡面令牌（实测 48）；浅色保持纯黑（白字终端观感是签核态）。
+        .backgroundColor(this.isDark ? $r('sys.color.ohos_id_color_card_bg') : Color.Black)
         .borderRadius($r('sys.float.corner_radius_level6'))
         .clip(true)
       }
       .width('100%')
       .height('100%')
-      .padding($r('sys.float.padding_level6'))
+      .padding({ left: $r('sys.float.padding_level6'), right: $r('sys.float.padding_level6'),
+        top: barBottomVp(this.getUIContext(), this.safeTopPx),
+        bottom: $r('sys.float.padding_level6') })
     }
-    .padding(safeAreaInsets(this.getUIContext(), this.safeTopPx, this.safeBottomPx))
-    .title('调试详情')
+    .padding(subPageBottom(this.getUIContext(), this.safeBottomPx))
+    // 顶栏要 avoidLayoutSafeArea: true，标题才落在状态栏之下；内容顶让满 barBottomVp（见其注释实测记录）
+    .titleBar(hdsTitleBarOptions('调试详情', this.isDark, TitleSize.TITLE_S, true))
     .backgroundColor($r('sys.color.ohos_id_color_sub_background'))
     .onReady((ctx: NavDestinationContext): void => {
       const p: Object | undefined = ctx.pathInfo.param as Object | undefined;

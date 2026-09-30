@@ -2,6 +2,18 @@
   "module": {
     "name": "entry",
     "type": "entry",
+    "metadata": [
+      {
+        // 应用级沉浸光感状态：uiMaterial.getMaterialInfo().state 读的就是这里，运行期没有 setter。
+        // default：普通组件可主动设置材质；enable：更多系统组件自动使用材质；
+        // disable：关闭整个应用的沉浸材质，主动设置的也一并失效。
+        // 只有写在 entry 类型 module 中才生效，改完必须重新构建安装。
+        // 此前未声明（读到 DEFAULT），顶栏 NavigationTitleOptions.systemMaterial 实测贡献 0 像素，
+        // 本次显式置 enable 验证材质是否开始画像素。
+        "name": "ohos.arkui.UIMaterial.state",
+        "value": "enable"
+      }
+    ],
     "description": "$string:module_desc",
     "mainElement": "EntryAbility",
     "deviceTypes": ["phone", "tablet", "2in1"],

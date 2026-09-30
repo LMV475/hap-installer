@@ -1909,7 +1909,10 @@ export struct Home {
     await this.doConnect();
   }
 
-  build() {
+  /** 首页主体：顶栏内边距作为内容内边距，外层 Scroll 提供可滚动视口（同 More.ets），
+   *  否则内容永远进不了顶栏幕布带，HDS 的 GRADIENT_BLUR 滚动档不生效（见 spec §5.5） */
+  @Builder
+  homeBody() {
     Column({ space: 12 }) {
       Column({ space: 0 }) {
         HomeSettingItem({
@@ -1984,12 +1987,22 @@ export struct Home {
       }
     }
     .width('100%')
-    .height('100%')
     .padding({ left: $r('sys.float.padding_level6'), right: $r('sys.float.padding_level6'),
       top: topInsetVp(this.getUIContext(), this.safeTopPx),
       bottom: bottomInsetVp(this.getUIContext(), this.safeBottomPx) })
-    .backgroundColor($r('sys.color.ohos_id_color_sub_background'))
     .alignItems(HorizontalAlign.Start)
+  }
+
+  build() {
+    Scroll() {
+      this.homeBody()
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor($r('sys.color.ohos_id_color_sub_background'))
+    .align(Alignment.TopStart)
+    .edgeEffect(EdgeEffect.Spring)
+    .scrollBar(BarState.Off)
     .bindSheet($$this.signSheetOpen, this.signConfigSheet(), {
       detents: [SheetSize.LARGE],
       title: { title: '签名配置' },

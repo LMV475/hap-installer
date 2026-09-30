@@ -6,12 +6,15 @@ import { AgcService } from '../common/AgcService';
 import { HdcService } from '../common/HdcService';
 import { loadHistoryTargets, clearHistoryTargets } from '../common/HistoryTargets';
 import { HapCard } from '../components/HapCard';
-import { safeAreaInsets } from '../common/Immersive';
+import { HdsNavDestination, TitleSize } from '@kit.UIDesignKit';
+import { subPageBottom, barBottomVp } from '../common/Immersive';
+import { hdsTitleBarOptions } from '../common/MaterialPolicy';
 
 /** 团队设备页（对应 Flutter team_device_page.dart：团队 / 可用设备 / 历史连接 三张卡片） */
 @Component
 export struct TeamDevice {
   @Consume('navStack') pathStack: NavPathStack;
+  @StorageLink('isDark') isDark: boolean = false;
   @StorageLink('safeTopPx') safeTopPx: number = 0;
   @StorageLink('safeBottomPx') safeBottomPx: number = 0;
   @State loggedIn: boolean = false;
@@ -19,6 +22,8 @@ export struct TeamDevice {
   @State currentTarget: string = '';
   @State history: string[] = [];
   @State refreshing: boolean = false;
+  // Scroll 的 Scroller 必须绑给 HdsNavDestination，栏带幕布才跟着渐隐（见 hdsTitleBarStyle 的 blurStrategy 注释）
+  private scrollCtrl: Scroller = new Scroller();
 
   private ctx(): common.UIAbilityContext {
     return this.getUIContext().getHostContext() as common.UIAbilityContext;
@@ -186,8 +191,8 @@ export struct TeamDevice {
   }
 
   build() {
-    NavDestination() {
-      Scroll() {
+    HdsNavDestination() {
+      Scroll(this.scrollCtrl) {
         Column({ space: 12 }) {
           HapCard({ title: '团队', content: (): void => { this.teamBody() } })
           HapCard({
@@ -204,14 +209,23 @@ export struct TeamDevice {
           })
         }
         .width('100%')
-        .padding($r('sys.float.padding_level6'))
+        .padding({ left: $r('sys.float.padding_level6'), right: $r('sys.float.padding_level6'),
+          top: barBottomVp(this.getUIContext(), this.safeTopPx),
+          bottom: $r('sys.float.padding_level6') })
       }
       .width('100%')
       .height('100%')
       .align(Alignment.TopStart)
+      // 与首页根 Scroll 同档（Home.ets 那处也是这两行）：到边回弹 + 不显示滚动条。
+      // Scroll 的 edgeEffect 默认 EdgeEffect.None（scroll.d.ts:1249），不给就是硬停；
+      // alwaysEnabled 在 Scroll 上默认已为 true，内容不足一屏也能拉动回弹。
+      .edgeEffect(EdgeEffect.Spring)
+      .scrollBar(BarState.Off)
     }
-    .padding(safeAreaInsets(this.getUIContext(), this.safeTopPx, this.safeBottomPx))
-    .title('团队设备')
+    .padding(subPageBottom(this.getUIContext(), this.safeBottomPx))
+    .bindToScrollable([this.scrollCtrl])
+    // 顶栏要 avoidLayoutSafeArea: true，标题才落在状态栏之下；内容顶让满 barBottomVp（见其注释实测记录）
+    .titleBar(hdsTitleBarOptions('团队设备', this.isDark, TitleSize.TITLE_S, true))
     .backgroundColor($r('sys.color.ohos_id_color_background'))
   }
 }

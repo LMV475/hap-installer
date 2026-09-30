@@ -3,7 +3,7 @@ import { Store, HistoryRow } from '../common/Store';
 import { PillButton } from '../components/PillButton';
 import { HapCard } from '../components/HapCard';
 import { BusinessError } from '@kit.BasicServicesKit';
-import { topInsetVp, bottomInsetVp } from '../common/Immersive';
+import { topInsetVp, bottomInsetVp, barBottomVp, REFRESH_INDICATOR_VP } from '../common/Immersive';
 
 @Component
 export struct History {
@@ -13,6 +13,8 @@ export struct History {
   @State rows: HistoryRow[] = [];
   @State loading: boolean = false;
   @State isRefreshing: boolean = false;
+  /** 下拉距离（vp，Refresh.onOffsetChange 给的单位就是 vp）。指示器用它跟列表一起下移 */
+  @State pullOffsetVp: number = 0;
   @State tipText: string = '';
   @State expandedId: number = -1;
 
@@ -89,8 +91,53 @@ export struct History {
     this.pathStack.pushPath({ name: 'DebugDetail', param: r });
   }
 
-  build() {
-    Refresh({ refreshing: $$this.isRefreshing }) {
+  /** 指示器居中在「栏底—列表首行」之间：中点 = 栏底 + (静止间距 + 下拉距离) / 2，再减去自身半径 */
+  private indicatorTopVp(): number {
+    const gap: number = topInsetVp(this.getUIContext(), this.safeTopPx) -
+      barBottomVp(this.getUIContext(), this.safeTopPx) + this.pullOffsetVp;
+    return barBottomVp(this.getUIContext(), this.safeTopPx) + gap / 2 - REFRESH_INDICATOR_VP / 2;
+  }
+
+  /** 顶栏与列表的间距（= 下拉距离）超过指示器高度才开始渐显，到 1.5 倍高度完全不透明 */
+  private indicatorOpacity(): number {
+    if (this.isRefreshing) {
+      return 1;
+    }
+    const gap: number = this.pullOffsetVp;
+    const h: number = REFRESH_INDICATOR_VP;
+    if (gap <= h) {
+      return 0;
+    }
+    const t: number = (gap - h) / (h * 0.5);
+    return t > 1 ? 1 : t;
+  }
+
+  /** Refresh 自己的揭示区从屏幕顶算起、又排在 Scroll 之下，指示器放里面必然被栏体/列表压住；
+   *  所以刷新区留空，指示器改用 Stack 上层的浮层（见 spec §5.5） */
+  @Builder
+  emptyIndicator() {
+    Column().width('100%')
+  }
+
+  @Builder
+  refreshIndicator() {
+    Column() {
+      LoadingProgress()
+        .width(REFRESH_INDICATOR_VP)
+        .height(REFRESH_INDICATOR_VP)
+        .color($r('sys.color.ohos_id_color_emphasize'))
+    }
+    .width('100%')
+    .justifyContent(FlexAlign.Center)
+    .position({ x: 0, y: this.indicatorTopVp() })
+    .opacity(this.indicatorOpacity())
+    // 浮层压在拖拽区上方，不能吃手势
+    .hitTestBehavior(HitTestMode.None)
+  }
+
+  @Builder
+  pageBody() {
+    Refresh({ refreshing: $$this.isRefreshing, builder: this.emptyIndicator() }) {
       Scroll() {
         Column({ space: 12 }) {
           if (this.tipText.length > 0) {
@@ -123,7 +170,10 @@ export struct History {
           }
         }
         .width('100%')
+        // 顶栏内边距必须作为滚动内容的内边距（同 More.ets）：放在页面根上会把 Scroll 视口压到栏底之下，
+        // 内容永远进不了栏下的幕布带，HDS 的 GRADIENT_BLUR 滚动档就永远不生效（见 spec §5.5 一致性缺陷）
         .padding({ left: $r('sys.float.padding_level6'), right: $r('sys.float.padding_level6'),
+          top: topInsetVp(this.getUIContext(), this.safeTopPx),
           bottom: bottomInsetVp(this.getUIContext(), this.safeBottomPx) })
         .alignItems(HorizontalAlign.Start)
       }
@@ -136,11 +186,23 @@ export struct History {
     .width('100%')
     .height('100%')
     .backgroundColor($r('sys.color.ohos_id_color_sub_background'))
-    .padding({ top: topInsetVp(this.getUIContext(), this.safeTopPx) })
-    .refreshOffset(32)
+    .refreshOffset(96)
+    .onOffsetChange((offset: number): void => { this.pullOffsetVp = offset; })
     .onRefreshing(() => {
       this.refresh();
     })
+  }
+
+  build() {
+    Stack() {
+      this.pageBody()
+
+      if (this.pullOffsetVp > 0 || this.isRefreshing) {
+        this.refreshIndicator()
+      }
+    }
+    .width('100%')
+    .height('100%')
   }
 
   @Builder

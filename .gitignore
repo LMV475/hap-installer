@@ -26,6 +26,7 @@ entry/src/AppScope/
 *.hilog
 *.jpeg
 *.png.log
+crash_log/
 
 # ===== 第三方官方源码副本（需手动获取，见 README） =====
 # hapsigner 官方源码及其内置第三方依赖

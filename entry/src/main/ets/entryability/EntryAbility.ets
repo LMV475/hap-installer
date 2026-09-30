@@ -1,12 +1,29 @@
 import { AbilityConstant, UIAbility, Want, Configuration, ConfigurationConstant } from '@kit.AbilityKit';
+import { BusinessError } from '@kit.BasicServicesKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
-import { window } from '@kit.ArkUI';
+import { window, FrameCallback, UIContext } from '@kit.ArkUI';
 import { fileIo } from '@kit.CoreFileKit';
 import { preferences } from '@kit.ArkData';
 import { logMaterialCapabilities } from '../common/MaterialPolicy';
 
+/** postFrameCallback 收的是 FrameCallback 抽象类实例，ArkTS 不允许用对象字面量顶替 */
+class ThemeFrameCallback extends FrameCallback {
+  private readonly action: () => void;
+
+  constructor(action: () => void) {
+    super();
+    this.action = action;
+  }
+
+  onFrame(frameTimeInNano: number): void {
+    this.action();
+  }
+}
+
 export default class EntryAbility extends UIAbility {
   private mainWin: window.Window | null = null;
+  /** 上次保存的深浅色意图；补枪要等到 loadContent 之后再发，靠这个字段把值带到那一刻 */
+  private themeMode: ConfigurationConstant.ColorMode | undefined = undefined;
 
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     try {
@@ -114,20 +131,77 @@ export default class EntryAbility extends UIAbility {
     }
   }
 
-  /** 启动时恢复上次保存的深浅色设置，保证「跟随系统」在进 App 前就生效 */
+  /**
+   * 启动时恢复上次保存的深浅色。用同步读而非 async：只有赶在第一帧之前拿到值，
+   * AppStorage.isDark 才能在首帧就是对的，否则首帧按浅色构建、标题白字压浅底，
+   * 补枪之后还要多闪一下。
+   */
   private restoreTheme(): void {
-    preferences.getPreferences(this.context, 'hapinstaller').then(async (store): Promise<void> => {
-      const follow: boolean = await store.get('followSystemDark', true) as boolean;
-      const dark: boolean = await store.get('darkModeOn', false) as boolean;
+    try {
+      const opts: preferences.Options = { name: 'hapinstaller' };
+      const store: preferences.Preferences = preferences.getPreferencesSync(this.context, opts);
+      const follow: boolean = store.getSync('followSystemDark', true) as boolean;
+      const dark: boolean = store.getSync('darkModeOn', false) as boolean;
       AppStorage.setOrCreate<boolean>('followSystemDark', follow);
       AppStorage.setOrCreate<boolean>('darkModeOn', dark);
-      const mode: ConfigurationConstant.ColorMode = follow
+      this.themeMode = follow
         ? ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET
         : (dark
           ? ConfigurationConstant.ColorMode.COLOR_MODE_DARK
           : ConfigurationConstant.ColorMode.COLOR_MODE_LIGHT);
+      this.applyThemeMode();
+      if (this.themeMode !== ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET) {
+        // 显式深浅色时 isDark 由我们自己种，不等 onConfigurationUpdate，首帧的标题墨色才对
+        this.applyBarColors(this.themeMode);
+      }
+    } catch (e) {
+      const err = e as BusinessError;
+      hilog.error(0x0000, 'HapInstaller', '%{public}s',
+        '[theme] 读深浅色偏好失败 code=' + err.code + ' msg=' + err.message);
+    }
+  }
+
+  private applyThemeMode(): void {
+    const mode: ConfigurationConstant.ColorMode | undefined = this.themeMode;
+    if (mode === undefined) {
+      return;
+    }
+    try {
       this.context.setColorMode(mode);
-    }).catch((): void => {});
+    } catch (e) {
+      const err = e as BusinessError;
+      hilog.error(0x0000, 'HapInstaller', '%{public}s',
+        '[theme] setColorMode(' + mode + ') 失败 code=' + err.code + ' msg=' + err.message);
+    }
+  }
+
+  /**
+   * 冷启动补枪：启动期那次 setColorMode 只改到 AbilityRuntime 的 Configuration
+   * （实测 config=DARK、AppStorage.isDark=true、onConfigurationUpdate 也到了），
+   * 但 ArkUI 的 ResourceManager 尚未挂上配置变更订阅，整屏 sys.color.* 仍按浅色限定解析。
+   * 首帧之后再发一次才会走「新建 RM → 全树重解析」那条路。
+   * 锚点实测（API 26 模拟器，相对 loadContent 回调）：0ms 与 +74ms 单发均无效；
+   * 连续两个 vsync（+50/+105ms）3/3 次翻成深色；固定 500ms 一直有效但留半秒浅色闪帧。
+   * vsync 早于 ArkUI 主题初始化时会打空，所以 500ms 兜底不能删 —— 打空的结果不是闪一下，是整程浅色。
+   */
+  private reapplyThemeAfterFirstFrame(): void {
+    if (this.themeMode === undefined ||
+      this.themeMode === ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET ||
+      this.mainWin === null) {
+      return;
+    }
+    setTimeout((): void => { this.applyThemeMode(); }, 500);
+    try {
+      const ui: UIContext = this.mainWin.getUIContext();
+      ui.postFrameCallback(new ThemeFrameCallback((): void => {
+        this.applyThemeMode();
+        ui.postFrameCallback(new ThemeFrameCallback((): void => { this.applyThemeMode(); }));
+      }));
+    } catch (e) {
+      const err = e as BusinessError;
+      hilog.error(0x0000, 'HapInstaller', '%{public}s',
+        '[theme] 帧锚点排期失败（500ms 兜底仍在）code=' + err.code + ' msg=' + err.message);
+    }
   }
 
   onConfigurationUpdate(newConfig: Configuration): void {
@@ -136,15 +210,16 @@ export default class EntryAbility extends UIAbility {
   }
 
   private applyBarColors(mode?: ConfigurationConstant.ColorMode): void {
-    if (this.mainWin === null) {
-      return;
-    }
     const colorMode: ConfigurationConstant.ColorMode | undefined = mode !== undefined
       ? mode : this.context.config.colorMode;
     const dark: boolean = colorMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK;
-    // 沉浸遮罩需要按深浅色给出带透明度的渐变色，token 无法直接取 alpha
+    // isDark 先写、不依赖 mainWin：onConfigurationUpdate 可能早于窗口就绪，而顶栏档位要靠它选档
     AppStorage.setOrCreate<boolean>('isDark', dark);
+    if (this.mainWin === null) {
+      return;
+    }
     const fg: string = dark ? '#FFFFFF' : '#000000';
+    // 沉浸遮罩需要按深浅色给出带透明度的渐变色，token 无法直接取 alpha
     this.mainWin.setWindowSystemBarProperties({
       statusBarColor: '#00000000',
       navigationBarColor: '#00000000',
@@ -159,6 +234,7 @@ export default class EntryAbility extends UIAbility {
         hilog.error(0x0000, 'HapInstaller', 'loadContent failed: %{public}s', JSON.stringify(err));
       }
       this.setupImmersiveWindow(windowStage);
+      this.reapplyThemeAfterFirstFrame();
       logMaterialCapabilities();
     });
   }
@@ -175,6 +251,9 @@ export default class EntryAbility extends UIAbility {
           win.getWindowAvoidArea(window.AvoidAreaType.TYPE_NAVIGATION_INDICATOR);
         AppStorage.setOrCreate<number>('safeTopPx', sysArea.topRect.height);
         AppStorage.setOrCreate<number>('safeBottomPx', navArea.bottomRect.height);
+        // 悬浮工具条的 barWidth 只能是绝对 vp（FloatingTabBarWidth 不支持百分比，也未写超宽是否截断），
+        // 二级页要让栏体接近满宽 → 由窗口实际宽度换算，而不是按某台设备写死。
+        AppStorage.setOrCreate<number>('winWidthPx', win.getWindowProperties().windowRect.width);
         this.applyBarColors();
       }).catch((): void => {});
       win.on('avoidAreaChange', (data: window.AvoidAreaOptions): void => {

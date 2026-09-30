@@ -4,7 +4,9 @@ import { fileIo } from '@kit.CoreFileKit';
 import { preferences } from '@kit.ArkData';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { BusinessError } from '@kit.BasicServicesKit';
-import { safeAreaInsets } from '../common/Immersive';
+import { HdsNavDestination, TitleSize } from '@kit.UIDesignKit';
+import { subPageBottom, barBottomVp } from '../common/Immersive';
+import { hdsTitleBarOptions, buttonMaterial, useSystemChrome } from '../common/MaterialPolicy';
 
 // AGC 通用入口：不硬编码具体项目 id，登录后由用户在控制台里进入自己的项目
 const AGC_URL: string = 'https://developer.huawei.com/consumer/cn/service/josp/agc/index.html';
@@ -14,6 +16,7 @@ export struct CertWeb {
   @Consume('navStack') pathStack: NavPathStack;
   @StorageLink('safeTopPx') safeTopPx: number = 0;
   @StorageLink('safeBottomPx') safeBottomPx: number = 0;
+  @StorageLink('isDark') isDark: boolean = false;
   private controller: webview.WebviewController = new webview.WebviewController();
   @State url: string = AGC_URL;
   @State status: string = '加载中…';
@@ -108,13 +111,14 @@ export struct CertWeb {
   }
 
   build() {
-    NavDestination() {
+    HdsNavDestination() {
       Column() {
         Row({ space: 8 }) {
           Button('返回')
             .fontSize(13)
             .backgroundColor($r('sys.color.ohos_id_color_sub_background'))
             .fontColor($r('sys.color.ohos_id_color_text_primary'))
+            .systemMaterial(useSystemChrome() ? buttonMaterial() : undefined)
             .onClick((): void => {
               this.pathStack.pop();
             })
@@ -179,9 +183,10 @@ export struct CertWeb {
       }
       .width('100%')
       .height('100%')
+      .padding({ top: barBottomVp(this.getUIContext(), this.safeTopPx) })
     }
-    .padding(safeAreaInsets(this.getUIContext(), this.safeTopPx, this.safeBottomPx))
-    .title('AGC 证书')
-    .hideTitleBar(false)
+    .padding(subPageBottom(this.getUIContext(), this.safeBottomPx))
+    // 顶栏要 avoidLayoutSafeArea: true，标题才落在状态栏之下；内容顶让满 barBottomVp（见其注释实测记录）
+    .titleBar(hdsTitleBarOptions('AGC 证书', this.isDark, TitleSize.TITLE_S, true))
   }
 }
