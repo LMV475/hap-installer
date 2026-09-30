@@ -1928,10 +1928,9 @@ export struct Home {
           buttonEnabled: !this.busy,
           onButtonTap: (): void => { this.doLogin(); }
         })
-        // 下面任一行可见时才需要这条分隔线：设备行（已登录）或安装包行（有包即可，含外部带入）
+        // 分割线1：在账号和设备之间，设备行可见时显示
         Divider().color($r('sys.color.ohos_id_color_list_separator'))
-          .visibility(this.agcUser.length > 0 || this.hapPath.length > 0
-            ? Visibility.Visible : Visibility.None)
+          .visibility(this.agcUser.length > 0 ? Visibility.Visible : Visibility.None)
         HomeSettingItem({
           title: this.target.length > 0 ? this.target : '未连接',
           description: '设备',
@@ -1942,8 +1941,9 @@ export struct Home {
           show: this.agcUser.length > 0,
           onButtonTap: (): void => { this.openConnectSheet(); }
         })
+        // 分割线2：在设备和安装包之间，安装包行可见时显示
         Divider().color($r('sys.color.ohos_id_color_list_separator'))
-          .visibility(this.agcUser.length > 0
+          .visibility(this.hapPath.length > 0 || (this.agcUser.length > 0 && this.target.length > 0)
             ? Visibility.Visible : Visibility.None)
         HomeSettingItem({
           title: this.hapPath.length > 0 ? this.hapLabel : '未选择',

@@ -164,7 +164,12 @@ export struct Cert {
     try {
       await AgcService.removeCert(c.id);
       this.tipText = '已删除: ' + c.certName;
-      await this.refresh();
+      // 直接从本地列表中移除，避免 refresh() 造成的闪烁
+      this.certs = this.certs.filter((item: AgcCertInfo): boolean => item.id !== c.id);
+      // 如果删除的是当前使用的证书，清空 currentName
+      if (this.currentName === c.certName) {
+        this.currentName = '';
+      }
     } catch (e) {
       const err = e as BusinessError;
       this.tipText = '删除失败: ' + err.message;
