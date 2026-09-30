@@ -157,3 +157,29 @@ export async function getSecret(alias: string): Promise<string> {
   }
   return decode(joinBytes(parts));
 }
+
+/** 删除一条凭据（所有分片）；返回是否成功 */
+export async function deleteSecret(alias: string): Promise<boolean> {
+  try {
+    // 先读片数，再逐片删除
+    const head: Uint8Array = await readChunk(alias + '#n');
+    if (head.length > 0) {
+      const count: number = head[0];
+      if (count > 0 && count <= MAX_CHUNKS) {
+        for (let i = 0; i < count; i++) {
+          await removeChunk(alias + '#' + i);
+        }
+      }
+      await removeChunk(alias + '#n');
+    } else {
+      // 没有片数记录，也尝试删除别名本身（兼容旧数据）
+      await removeChunk(alias);
+    }
+    hilog.info(DOMAIN, TAG, '[secure] %{public}s 已删除', alias);
+    return true;
+  } catch (e) {
+    const err = e as BusinessError;
+    hilog.error(DOMAIN, TAG, '[secure] 删除 %{public}s 失败: %{public}s', alias, err.message);
+    return false;
+  }
+}

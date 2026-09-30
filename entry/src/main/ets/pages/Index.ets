@@ -5,7 +5,7 @@ import { More } from './More';
 import { CertWeb } from './CertWeb';
 import { Terminal } from './Terminal';
 import { Acl } from './Acl';
-import { TeamDevice } from './TeamDevice';
+// import { TeamDevice } from './TeamDevice'; // 暂时屏蔽
 import { UserGuide } from './UserGuide';
 import { Privacy } from './Privacy';
 import { DebugDetail } from './DebugDetail';
@@ -35,8 +35,8 @@ struct Index {
       Terminal()
     } else if (name === 'Acl') {
       Acl()
-    } else if (name === 'TeamDevice') {
-      TeamDevice()
+    // } else if (name === 'TeamDevice') { // 暂时屏蔽
+    //   TeamDevice()
     } else if (name === 'UserGuide') {
       UserGuide()
     } else if (name === 'Privacy') {
