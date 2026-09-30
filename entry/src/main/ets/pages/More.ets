@@ -82,8 +82,10 @@ export struct More {
   @StorageLink('safeBottomPx') safeBottomPx: number = 0;
   @State tipText: string = '';
   @State checkingUpdate: boolean = false;
-  /** 签名配置入口：默认隐藏，连点「应用版本」十下才出现，且只在本进程内有效 */
+  /** 签名配置入口：默认隐藏，连点「应用版本」20 次才出现 */
   @State signEntryVisible: boolean = false;
+  /** 重置签名配置入口：默认隐藏，连点「应用版本」20 次才出现 */
+  @State resetSignVisible: boolean = false;
   private versionTaps: number = 0;
   private lastVersionTap: number = 0;
   private appVersion: string = '1.0.0';
@@ -216,21 +218,22 @@ export struct More {
     return this.getUIContext().getHostContext() as common.UIAbilityContext;
   }
 
-  /** 连点十下版本号显示签名配置入口；间隔超过 2s 重新计数 */
+  /** 连点二十下版本号显示签名配置与重置入口；间隔超过 2s 重新计数 */
   private onVersionTap(): void {
-    if (this.signEntryVisible) {
+    if (this.signEntryVisible && this.resetSignVisible) {
       return;
     }
     const now: number = Date.now();
     this.versionTaps = now - this.lastVersionTap > 2000 ? 1 : this.versionTaps + 1;
     this.lastVersionTap = now;
-    if (this.versionTaps >= 10) {
+    if (this.versionTaps >= 20) {
       this.versionTaps = 0;
       this.signEntryVisible = true;
-      promptAction.showToast({ message: '已显示「签名配置」入口', duration: 2000 });
-    } else if (this.versionTaps >= 7) {
+      this.resetSignVisible = true;
+      promptAction.showToast({ message: '已显示「签名配置」与「重置签名配置」入口', duration: 2000 });
+    } else if (this.versionTaps >= 17) {
       promptAction.showToast({
-        message: '再点 ' + (10 - this.versionTaps) + ' 次显示签名配置', duration: 1000
+        message: '再点 ' + (20 - this.versionTaps) + ' 次显示签名配置', duration: 1000
       });
     }
   }
@@ -370,26 +373,27 @@ export struct More {
   @Builder
   settingsBody() {
     Column({ space: 0 }) {
-      if (this.signEntryVisible) {
-        MoreRow({ label: '签名配置', subText: '证书 / 密钥库 / AGC 申请', type: 'arrow',
-          onTap: (): void => { this.openSignConfig(); } })
-        Divider().color($r('sys.color.ohos_id_color_list_separator'))
-      }
       MoreRow({ label: '清空数据', subText: 'preferences + 登录态', type: 'arrow',
         onTap: (): void => { this.confirmClear(); } })
       Divider().color($r('sys.color.ohos_id_color_list_separator'))
-      MoreRow({ label: '重置签名配置', subText: '仅清除证书/Profile/密钥库路径', type: 'arrow',
-        onTap: (): void => { this.confirmResetSign(); } })
-      Divider().color($r('sys.color.ohos_id_color_list_separator'))
+      MoreRow({ label: '查看目录', type: 'arrow',
+        onTap: (): void => { this.showDirs(); } })
+      if (this.signEntryVisible) {
+        Divider().color($r('sys.color.ohos_id_color_list_separator'))
+        MoreRow({ label: '签名配置', subText: '证书 / 密钥库 / AGC 申请', type: 'arrow',
+          onTap: (): void => { this.openSignConfig(); } })
+      }
+      if (this.resetSignVisible) {
+        Divider().color($r('sys.color.ohos_id_color_list_separator'))
+        MoreRow({ label: '重置签名配置', subText: '仅清除证书/Profile/密钥库路径', type: 'arrow',
+          onTap: (): void => { this.confirmResetSign(); } })
+      }
       // 暂时屏蔽自动无线调试端口
       // MoreRow({ label: '自动无线调试端口', type: 'switch', isOn: this.autoPortOn,
       //   onToggle: (v: boolean): void => {
       //     this.autoPortOn = v;
       //     this.saveThemePrefs();
       //   } })
-      // Divider().color($r('sys.color.ohos_id_color_list_separator'))
-      MoreRow({ label: '查看目录', type: 'arrow',
-        onTap: (): void => { this.showDirs(); } })
     }.width('100%')
   }
 
