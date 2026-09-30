@@ -9,6 +9,10 @@ import { HapCard } from '../components/HapCard';
 import { PillButton } from '../components/PillButton';
 import { topInsetVp, bottomInsetVp } from '../common/Immersive';
 import { dialogMaterial, useSystemChrome } from '../common/MaterialPolicy';
+import { deleteSecret } from '../common/SecureStore';
+import { AgcService } from '../common/AgcService';
+
+const AGC_AUTH_ALIAS: string = 'hapinstaller_agc_auth';
 
 const PROJECT_REPO: string = 'https://github.com/LMV475/hap-installer';
 const RELEASE_API: string = 'https://api.github.com/repos/LMV475/hap-installer/releases/latest';
@@ -294,6 +298,12 @@ export struct More {
         await store.delete('p12Path');
       } else {
         await store.clear();
+        // 同时清空 SecureStore 中的登录态
+        await deleteSecret(AGC_AUTH_ALIAS);
+        // 清除 AgcService 内存中的登录态，确保证书页立即更新
+        AgcService.logout();
+        // 清空 AppStorage 中的 agcUser，触发首页和证书页更新
+        AppStorage.setOrCreate<string>('agcUser', '');
       }
       await store.flush();
       this.tipText = signOnly ? '签名配置已重置' : '所有数据已清空';
@@ -350,9 +360,10 @@ export struct More {
       Divider().color($r('sys.color.ohos_id_color_list_separator'))
       MoreRow({ label: 'ACL 权限', subText: 'Profile 申请使用的权限列表', type: 'arrow',
         onTap: (): void => { this.pathStack.pushPath({ name: 'Acl' }); } })
-      Divider().color($r('sys.color.ohos_id_color_list_separator'))
-      MoreRow({ label: '团队设备', subText: '团队 / 设备 / 历史连接', type: 'arrow',
-        onTap: (): void => { this.pathStack.pushPath({ name: 'TeamDevice' }); } })
+      // 暂时屏蔽团队设备入口
+      // Divider().color($r('sys.color.ohos_id_color_list_separator'))
+      // MoreRow({ label: '团队设备', subText: '团队 / 设备 / 历史连接', type: 'arrow',
+      //   onTap: (): void => { this.pathStack.pushPath({ name: 'TeamDevice' }); } })
     }.width('100%')
   }
 
@@ -370,12 +381,13 @@ export struct More {
       MoreRow({ label: '重置签名配置', subText: '仅清除证书/Profile/密钥库路径', type: 'arrow',
         onTap: (): void => { this.confirmResetSign(); } })
       Divider().color($r('sys.color.ohos_id_color_list_separator'))
-      MoreRow({ label: '自动无线调试端口', type: 'switch', isOn: this.autoPortOn,
-        onToggle: (v: boolean): void => {
-          this.autoPortOn = v;
-          this.saveThemePrefs();
-        } })
-      Divider().color($r('sys.color.ohos_id_color_list_separator'))
+      // 暂时屏蔽自动无线调试端口
+      // MoreRow({ label: '自动无线调试端口', type: 'switch', isOn: this.autoPortOn,
+      //   onToggle: (v: boolean): void => {
+      //     this.autoPortOn = v;
+      //     this.saveThemePrefs();
+      //   } })
+      // Divider().color($r('sys.color.ohos_id_color_list_separator'))
       MoreRow({ label: '查看目录', type: 'arrow',
         onTap: (): void => { this.showDirs(); } })
     }.width('100%')

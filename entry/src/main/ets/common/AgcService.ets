@@ -72,6 +72,11 @@ export class AgcService {
     // stub：不保存任何登录态，参数仅为保持接口兼容
   }
 
+  /** 清除内存中的登录态（用于退出登录/清空数据） */
+  static logout(): void {
+    // stub：不保存任何登录态
+  }
+
   static async refreshAuth(): Promise<boolean> {
     return false;
   }

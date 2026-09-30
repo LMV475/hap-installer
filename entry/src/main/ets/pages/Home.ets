@@ -45,7 +45,7 @@ export struct Home {
   @State signedPath: string = '';
   @State udid: string = '';
   @State csrPath: string = '';
-  @State agcUser: string = '';
+  @StorageLink('agcUser') agcUser: string = '';
   @State packageName: string = '';
   @State matLabel: string = '证书材料未选择';
   /** 材料来源：'builtin' = 默认使用内置测试链；'custom' = 用户在「签名配置」里自配置的材料 */
