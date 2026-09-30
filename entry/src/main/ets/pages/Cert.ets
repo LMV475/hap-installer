@@ -4,6 +4,7 @@ import { request } from '@kit.BasicServicesKit';
 import { promptAction } from '@kit.ArkUI';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { preferences } from '@kit.ArkData';
+import { hilog } from '@kit.PerformanceAnalysisKit';
 import { AgcService, AgcCertInfo } from '../common/AgcService';
 import { HapCard } from '../components/HapCard';
 import { PillButton } from '../components/PillButton';
@@ -24,16 +25,30 @@ export struct Cert {
   @State tipText: string = '';
   @State currentName: string = '';
   // 监听首页登录态变化（agcUser 改变说明刚登录/更换账号）
-  @StorageLink('agcUser') agcUser: string = '';
+  @StorageLink('agcUser') @Watch('onAgcUserChanged') agcUser: string = '';
   private lastAgcUser: string = '';
 
   aboutToAppear(): void {
     this.lastAgcUser = this.agcUser;
+    hilog.info(0x0000, 'Cert', '[cert] aboutToAppear: agcUser=%{public}s, isLoggedIn=%{public}b', 
+      this.agcUser, AgcService.isLoggedIn());
     this.refresh();
   }
 
   onPageShow(): void {
-    // 从首页返回时，如果 agcUser 发生变化（刚登录/更换账号），重新加载证书列表
+    // 从其他页面返回时，如果 agcUser 发生变化（刚登录/更换账号），重新加载证书列表
+    hilog.info(0x0000, 'Cert', '[cert] onPageShow: agcUser=%{public}s, lastAgcUser=%{public}s, changed=%{public}b',
+      this.agcUser, this.lastAgcUser, this.agcUser !== this.lastAgcUser);
+    if (this.agcUser !== this.lastAgcUser) {
+      this.lastAgcUser = this.agcUser;
+      this.refresh();
+    }
+  }
+
+  onAgcUserChanged(): void {
+    // agcUser 变化时立即刷新（包括首次登录后）
+    hilog.info(0x0000, 'Cert', '[cert] onAgcUserChanged: agcUser=%{public}s, lastAgcUser=%{public}s, changed=%{public}b',
+      this.agcUser, this.lastAgcUser, this.agcUser !== this.lastAgcUser);
     if (this.agcUser !== this.lastAgcUser) {
       this.lastAgcUser = this.agcUser;
       this.refresh();
@@ -50,9 +65,12 @@ export struct Cert {
   }
 
   private async refresh(): Promise<void> {
+    hilog.info(0x0000, 'Cert', '[cert] refresh: isLoggedIn=%{public}b, loading=%{public}b, isRefreshing=%{public}b',
+      AgcService.isLoggedIn(), this.loading, this.isRefreshing);
     if (!AgcService.isLoggedIn()) {
       this.certs = [];
       this.finishRefresh();
+      hilog.info(0x0000, 'Cert', '[cert] refresh: not logged in, cleared certs');
       return;
     }
     // 下拉刷新时不显示 loading 文本，避免闪烁；只有首次加载才显示
