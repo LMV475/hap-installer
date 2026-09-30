@@ -2,6 +2,7 @@ import { HdsNavDestination, TitleSize } from '@kit.UIDesignKit';
 import { subPageBottom, barBottomVp, PILL_BOTTOM_GAP_VP } from '../common/Immersive';
 import { hdsTitleBarOptions } from '../common/MaterialPolicy';
 import { HapCard } from '../components/HapCard';
+import { PillButton } from '../components/PillButton';
 import { UIContext } from '@kit.ArkUI';
 
 /** 使用教程页（原生 ArkUI 实现，支持顶栏渐隐效果） */
@@ -132,14 +133,9 @@ export struct UserGuide {
   }
 
   @Builder
-  demoButton(label: string, bgColor?: Resource) {
-    Text(label)
-      .fontSize(13)
-      .fontColor(Color.White)
-      .padding({ left: 14, right: 14, top: 6, bottom: 6 })
-      .backgroundColor(bgColor ?? $r('sys.color.ohos_id_color_emphasize'))
-      .borderRadius(20)
-      .margin({ top: 4, bottom: 4 })
+  demoButton(label: string, variant?: 'primary' | 'secondary') {
+    PillButton({ label: label, variant: variant ?? 'primary', enabled_: true,
+      onClickAction: (): void => {} })
   }
 
   @Builder
@@ -227,7 +223,7 @@ export struct UserGuide {
       this.stepContent('前三步完成后，页面底部会出现两个安装按钮：')
 
       this.stepHeader('4a', '开始调试（自动签名）', '#34C759')
-      this.demoButton('开始调试（自动签名）', $r('sys.color.ohos_id_color_emphasize'))
+      this.demoButton('开始调试（自动签名）', 'primary')
       this.stepContent('点击此按钮，应用会自动完成签名并安装到设备。适合需要调试的未签名 HAP 包。')
       Column({ space: 4 }) {
         Text('• 自动使用内置签名材料（证书 / 密钥库 / Profile）')
@@ -251,7 +247,7 @@ export struct UserGuide {
       this.divider()
 
       this.stepHeader('4b', '直接安装（需已签名）', '#FF9500')
-      this.demoButton('直接安装（需已签名）', $r('sys.color.ohos_id_color_text_tertiary'))
+      this.demoButton('直接安装（需已签名）', 'secondary')
       this.stepContent('点击此按钮，应用会跳过签名步骤，直接将已签名的 HAP 安装到设备。适合已有有效签名的安装包。')
       Column({ space: 4 }) {
         Text('• 安装包必须已通过华为 CA 链签名，否则系统会拒绝安装')
