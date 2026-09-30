@@ -1,7 +1,8 @@
 import { HdsNavDestination, TitleSize } from '@kit.UIDesignKit';
-import { subPageBottom, barBottomVp } from '../common/Immersive';
+import { subPageBottom, barBottomVp, PILL_BOTTOM_GAP_VP } from '../common/Immersive';
 import { hdsTitleBarOptions } from '../common/MaterialPolicy';
 import { HapCard } from '../components/HapCard';
+import { UIContext } from '@kit.ArkUI';
 
 /** 使用教程页（原生 ArkUI 实现，支持顶栏渐隐效果） */
 @Component
@@ -40,7 +41,8 @@ export struct UserGuide {
         .padding({ left: $r('sys.float.padding_level6'), right: $r('sys.float.padding_level6'),
           // barBottomVp 让满标题栏底；额外 +16vp 把 HapCard 推入 GRADIENT_BLUR 模糊带渐隐段
           top: barBottomVp(this.getUIContext(), this.safeTopPx) + 16,
-          bottom: $r('sys.float.padding_level6') })
+          // 底部留出安全区 + 小间隙，让内容延伸到导航栏下方但最后元素有留白
+          bottom: this.getUIContext().px2vp(this.safeBottomPx) + PILL_BOTTOM_GAP_VP })
         .alignItems(HorizontalAlign.Start)
       }
       .width('100%')
@@ -50,7 +52,6 @@ export struct UserGuide {
       .edgeEffect(EdgeEffect.Spring)
       .scrollBar(BarState.Off)
     }
-    .padding(subPageBottom(this.getUIContext(), this.safeBottomPx))
     .bindToScrollable([this.scrollCtrl])
     // 顶栏要 avoidLayoutSafeArea: true，标题才落在状态栏之下；内容顶让满 barBottomVp
     .titleBar(hdsTitleBarOptions('使用教程', this.isDark, TitleSize.TITLE_S, true))
