@@ -54,7 +54,7 @@ export struct UserGuide {
     .bindToScrollable([this.scrollCtrl])
     // 顶栏要 avoidLayoutSafeArea: true，标题才落在状态栏之下；内容顶让满 barBottomVp
     .titleBar(hdsTitleBarOptions('使用教程', this.isDark, TitleSize.TITLE_S, true))
-    .backgroundColor($r('sys.color.ohos_id_color_background'))
+    .backgroundColor($r('sys.color.ohos_id_color_sub_background'))
   }
 
   @Builder
