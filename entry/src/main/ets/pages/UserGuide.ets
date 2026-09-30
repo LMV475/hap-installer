@@ -46,6 +46,7 @@ export struct UserGuide {
       .width('100%')
       .height('100%')
       .align(Alignment.TopStart)
+      .backgroundColor($r('sys.color.ohos_id_color_sub_background'))
       .edgeEffect(EdgeEffect.Spring)
       .scrollBar(BarState.Off)
     }
