@@ -163,7 +163,7 @@ export struct Terminal {
         .systemMaterial(mode === 'tabbar' ? plainButtonMaterial(this.isDark)
           : (useSystemChrome() ? buttonMaterial() : undefined))
         // 手挂小阴影（TOOLBAR_MANUAL_SHADOW）：radius 8 / offsetY 2 / 8% 黑，替代材质层大扩散 applyShadow
-        .shadow(mode === 'tabbar' && TOOLBAR_MANUAL_SHADOW
+        .shadow(TOOLBAR_MANUAL_SHADOW
           ? toolbarControlShadow()
           : NO_TOOLBAR_SHADOW)
         .stateStyles({ normal: { opacity: 1 }, pressed: { opacity: 0.6 } })
@@ -191,7 +191,7 @@ export struct Terminal {
           : (mode === 'overlay' ? OVERLAY_CONTROL_BG : $r('sys.color.ohos_id_color_button_normal'))))
       .systemMaterial(mode === 'tabbar' ? plainButtonMaterial(this.isDark)
         : (plainButtonMaterialOnly() ? plainButtonMaterial(this.isDark) : usePlainButtonMaterial() ? buttonMaterial() : undefined))
-      .shadow(mode === 'tabbar' && TOOLBAR_MANUAL_SHADOW
+      .shadow(TOOLBAR_MANUAL_SHADOW
         ? toolbarControlShadow()
         : NO_TOOLBAR_SHADOW)
       .stateStyles({ normal: { opacity: 1 }, pressed: { opacity: 0.6 } })
