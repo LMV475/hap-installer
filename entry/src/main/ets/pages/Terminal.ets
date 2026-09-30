@@ -106,6 +106,8 @@ export struct Terminal {
       Blank()
       Button('加载日志')
         .fontSize(13)
+        .height(40)
+        .borderRadius($r('sys.float.corner_radius_level8'))
         .backgroundColor(plainButtonMaterialOnly() ? undefined : $r('sys.color.ohos_id_color_button_normal'))
         .fontColor($r('sys.color.ohos_id_color_emphasize'))
         .systemMaterial(plainButtonMaterialOnly() ? plainButtonMaterial(this.isDark) : usePlainButtonMaterial() ? buttonMaterial() : undefined)
@@ -114,6 +116,8 @@ export struct Terminal {
         .onClick((): void => { this.loadLog(); })
       Button('清空')
         .fontSize(13)
+        .height(40)
+        .borderRadius($r('sys.float.corner_radius_level8'))
         .backgroundColor(plainButtonMaterialOnly() ? undefined : $r('sys.color.ohos_id_color_button_normal'))
         .fontColor($r('sys.color.ohos_id_color_emphasize'))
         .systemMaterial(plainButtonMaterialOnly() ? plainButtonMaterial(this.isDark) : usePlainButtonMaterial() ? buttonMaterial() : undefined)
@@ -122,7 +126,7 @@ export struct Terminal {
         .onClick((): void => { this.results = []; })
     }
     .width('100%')
-    .padding({ top: 4, bottom: 4 })
+    .padding({ left: $r('sys.float.padding_level6'), right: $r('sys.float.padding_level6'), top: 12, bottom: 12 })
   }
 
   @Builder
@@ -152,14 +156,6 @@ export struct Terminal {
       // 回弹对齐首页 Scroll；List 默认只在内容超一屏时回弹，所以要显式 alwaysEnabled
       .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
       .scrollBar(BarState.Off)
-
-      if (this.loading) {
-        LoadingProgress()
-          .width(16)
-          .height(16)
-          .color('#88FFFFFF')
-          .margin(12)
-      }
     }
     .layoutWeight(1)
     .width('100%')

@@ -89,6 +89,8 @@ export struct Acl {
       Blank()
       Button('重置为默认')
         .fontSize(13)
+        .height(40)
+        .borderRadius($r('sys.float.corner_radius_level8'))
         .backgroundColor(plainButtonMaterialOnly() ? undefined : $r('sys.color.ohos_id_color_button_normal'))
         .fontColor($r('sys.color.ohos_id_color_emphasize'))
         .systemMaterial(plainButtonMaterialOnly() ? plainButtonMaterial(this.isDark) : usePlainButtonMaterial() ? buttonMaterial() : undefined)
@@ -97,7 +99,7 @@ export struct Acl {
         .onClick((): void => { this.resetDefault(); })
     }
     .width('100%')
-    .padding({ top: 4, bottom: 4 })
+    .padding({ left: $r('sys.float.padding_level6'), right: $r('sys.float.padding_level6'), top: 12, bottom: 12 })
   }
 
   @Builder
