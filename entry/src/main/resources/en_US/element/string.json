@@ -13,6 +13,10 @@
       "value": "HapInstaller"
     },
     {
+      "name": "detect_gesture_reason",
+      "value": "Detect holding hand for smart grip adaptation, improving one-handed operation"
+    },
+    {
       "name": "EntryFormAbility_desc",
       "value": "form_description"
     },

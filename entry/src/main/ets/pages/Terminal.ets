@@ -1,7 +1,9 @@
 import { common } from '@kit.AbilityKit';
 import { fileIo } from '@kit.CoreFileKit';
+import { hilog } from '@kit.PerformanceAnalysisKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { FrameCallback } from '@kit.ArkUI';
+import { motion } from '@kit.MultimodalAwarenessKit';
 import { HdcService } from '../common/HdcService';
 import { HdsNavDestination, TitleSize } from '@kit.UIDesignKit';
 import { subPageBottom, barBottomVp, TOOLBAR_BAR_HEIGHT_VP, toolbarBarWidthVp } from '../common/Immersive';
@@ -15,10 +17,37 @@ export struct Terminal {
   @StorageLink('safeTopPx') safeTopPx: number = 0;
   @StorageLink('safeBottomPx') safeBottomPx: number = 0;
   @StorageLink('winWidthPx') winWidthPx: number = 0;
+  @StorageLink('isLeftHanded') isLeftHanded: boolean = false;
   @State cmd: string = 'hdc list targets';
   @State results: string[] = [];
   @State loading: boolean = false;
   private scroller: Scroller = new Scroller();
+
+  aboutToAppear(): void {
+    this.initHandedness();
+  }
+
+  aboutToDisappear(): void {
+    try {
+      motion.off('holdingHandChanged');
+    } catch (_e) {
+      // device not supported or subscription not active
+    }
+  }
+
+  private initHandedness(): void {
+    try {
+      if (!canIUse('SystemCapability.MultimodalAwareness.Motion')) {
+        hilog.warn(0x0000, 'Terminal', 'Device does not support Motion capability');
+        return;
+      }
+      motion.on('holdingHandChanged', (status: motion.HoldingHandStatus): void => {
+        AppStorage.set<boolean>('isLeftHanded', status === motion.HoldingHandStatus.LEFT_HAND_HELD);
+      });
+    } catch (e) {
+      hilog.warn(0x0000, 'Terminal', 'holdingHandChanged not supported: %{public}s', (e as BusinessError).message);
+    }
+  }
 
   private ctx(): common.UIAbilityContext {
     return this.getUIContext().getHostContext() as common.UIAbilityContext;
@@ -146,58 +175,24 @@ export struct Terminal {
    * 'tabbar'＝单页签 Tabs 自定义底栏（生效区，控件材质膜、表面色不可调）；'inline'＝普通列内（原形态）。
    */
   @Builder
+  /**
+   * 工具条三档：'overlay'＝页面内容区底部浮层（方案 B，Row 挂 backgroundEffect 模糊条）；
+   * 'tabbar'＝单页签 Tabs 自定义底栏（生效区，控件材质膜、表面色不可调）；'inline'＝普通列内（原形态）。
+   * 根据握持方向（isLeftHanded）自动调换输入框与按钮顺序：
+   * 右手→输入框在左、按钮在右；左手→按钮在左、输入框在右。
+   */
+  @Builder
   cmdBar(mode: 'overlay' | 'tabbar' | 'inline') {
     Row({ space: 8 }) {
-      TextInput({ text: this.cmd, placeholder: '输入 HDC 命令...' })
-        .layoutWeight(1)
-        .height(44)
-        .borderRadius(22)
-        // 探针轮已证 TextInput 在 TabBar 里材质**真实渲染**（深色下 25→43 出现像素信号），
-        // 但膜下疑似掺了组件默认底色（同材质按钮 20、输入框 43）→ 生效区内显式清空为 Transparent；
-        // overlay/inline 在内容区，膜不接管，语义底色可调且可用；overlay 浮在暗色模糊条上，
-        // button_normal（#0C000000 透明黑）近乎隐形 → 用半透明白（见 MaterialPolicy.OVERLAY_CONTROL_BG）。
-        .backgroundColor(mode === 'tabbar' ? Color.Transparent
-          : (mode === 'overlay' ? OVERLAY_CONTROL_BG : $r('sys.color.ohos_id_color_button_normal')))
-        // tabbar 档挂 plainButtonMaterial（THIN+applyShadow+interactive+lightEffect，与发送按钮同份）；
-        // overlay/inline 在内容区材质 inert（真机轮 3 三证），只留语义底色 + 原生按压态。
-        .systemMaterial(mode === 'tabbar' ? plainButtonMaterial(this.isDark)
-          : (useSystemChrome() ? buttonMaterial() : undefined))
-        // 手挂小阴影（TOOLBAR_MANUAL_SHADOW）：radius 8 / offsetY 2 / 8% 黑，替代材质层大扩散 applyShadow
-        .shadow(TOOLBAR_MANUAL_SHADOW
-          ? toolbarControlShadow()
-          : NO_TOOLBAR_SHADOW)
-        .stateStyles({ normal: { opacity: 1 }, pressed: { opacity: 0.6 } })
-        .enabled(!this.loading)
-        .onChange((v: string): void => { this.cmd = v; })
-        .onSubmit((): void => { this.send(); })
-        .accessibilityText('命令输入框')
-      Button() {
-        if (this.loading) {
-          LoadingProgress().width(22).height(22)
-            .color($r('sys.color.ohos_id_color_emphasize'))
-        } else {
-          SymbolGlyph($r('sys.symbol.paperplane_fill'))
-            .fontSize(20)
-            .fontColor([$r('sys.color.ohos_id_color_emphasize')])
-        }
+      if (this.isLeftHanded) {
+        // 左手握持：发送按钮居左，输入框居右
+        this.cmdButton(mode)
+        this.cmdInput(mode)
+      } else {
+        // 右手握持（默认）：输入框居左，发送按钮居右
+        this.cmdInput(mode)
+        this.cmdButton(mode)
       }
-      .width(44)
-      .height(44)
-      .borderRadius(22)
-      // TabBar 生效区内膜会盖住 backgroundColor，表面色不可调 → 不下发，样式走 plainButtonMaterial 的阴影；
-      // overlay/inline 在内容区底色可调；overlay 浮在暗色模糊条上，button_normal 透明黑近乎隐形 → 半透明白
-      .backgroundColor(mode === 'tabbar' ? undefined
-        : (plainButtonMaterialOnly() ? undefined
-          : (mode === 'overlay' ? OVERLAY_CONTROL_BG : $r('sys.color.ohos_id_color_button_normal'))))
-      .systemMaterial(mode === 'tabbar' ? plainButtonMaterial(this.isDark)
-        : (plainButtonMaterialOnly() ? plainButtonMaterial(this.isDark) : usePlainButtonMaterial() ? buttonMaterial() : undefined))
-      .shadow(TOOLBAR_MANUAL_SHADOW
-        ? toolbarControlShadow()
-        : NO_TOOLBAR_SHADOW)
-      .stateStyles({ normal: { opacity: 1 }, pressed: { opacity: 0.6 } })
-      .enabled(!this.loading)
-      .accessibilityText('发送命令')
-      .onClick((): void => { this.send(); })
     }
     .width('100%')
     .padding(mode === 'inline'
@@ -206,6 +201,70 @@ export struct Terminal {
     // 方案 B 的模糊条：与原生顶栏被证实的档同一配方（radius 60 + saturation 1.4，不加 color），
     // 透色且严格止于栏矩形；blur 半径单位 vp，60 在 76vp 高的条上是重模糊，量数后再调。
     .backgroundEffect(mode === 'overlay' ? { radius: 60, saturation: 1.4 } : undefined)
+  }
+
+  @Builder
+  cmdInput(mode: 'overlay' | 'tabbar' | 'inline') {
+    TextInput({ text: this.cmd, placeholder: '输入 HDC 命令...' })
+      .layoutWeight(1)
+      .height(44)
+      .borderRadius(22)
+      // 探针轮已证 TextInput 在 TabBar 里材质**真实渲染**（深色下 25→43 出现像素信号），
+      // 但膜下疑似掺了组件默认底色（同材质按钮 20、输入框 43）→ 生效区内显式清空为 Transparent；
+      // overlay/inline 在内容区，膜不接管，语义底色可调且可用；overlay 浮在暗色模糊条上，
+      // button_normal（#0C000000 透明黑）近乎隐形 → 用半透明白（见 MaterialPolicy.OVERLAY_CONTROL_BG）。
+      .backgroundColor(mode === 'tabbar' ? Color.Transparent
+        : (mode === 'overlay' ? OVERLAY_CONTROL_BG : $r('sys.color.ohos_id_color_button_normal')))
+      // tabbar 档挂 plainButtonMaterial（THIN+applyShadow+interactive+lightEffect，与发送按钮同份）；
+      // overlay/inline 在内容区材质 inert（真机轮 3 三证），只留语义底色 + 原生按压态。
+      .systemMaterial(mode === 'tabbar' ? plainButtonMaterial(this.isDark)
+        : (useSystemChrome() ? buttonMaterial() : undefined))
+      // 手挂小阴影（TOOLBAR_MANUAL_SHADOW）：radius 8 / offsetY 2 / 8% 黑，替代材质层大扩散 applyShadow
+      .shadow(TOOLBAR_MANUAL_SHADOW
+        ? toolbarControlShadow()
+        : NO_TOOLBAR_SHADOW)
+      .stateStyles({ normal: { opacity: 1 }, pressed: { opacity: 0.6 } })
+      .enabled(!this.loading)
+      .onChange((v: string): void => { this.cmd = v; })
+      .onSubmit((): void => { this.send(); })
+      .accessibilityText('命令输入框')
+      .transition(TransitionEffect.opacity(0)
+        .combine(TransitionEffect.scale({ x: 0.9, y: 0.9 }))
+        .animation({ duration: 250, curve: Curve.EaseInOut }))
+  }
+
+  @Builder
+  cmdButton(mode: 'overlay' | 'tabbar' | 'inline') {
+    Button() {
+      if (this.loading) {
+        LoadingProgress().width(22).height(22)
+          .color($r('sys.color.ohos_id_color_emphasize'))
+      } else {
+        SymbolGlyph($r('sys.symbol.paperplane_fill'))
+          .fontSize(20)
+          .fontColor([$r('sys.color.ohos_id_color_emphasize')])
+      }
+    }
+    .width(44)
+    .height(44)
+    .borderRadius(22)
+    // TabBar 生效区内膜会盖住 backgroundColor，表面色不可调 → 不下发，样式走 plainButtonMaterial 的阴影；
+    // overlay/inline 在内容区底色可调；overlay 浮在暗色模糊条上，button_normal 透明黑近乎隐形 → 半透明白
+    .backgroundColor(mode === 'tabbar' ? undefined
+      : (plainButtonMaterialOnly() ? undefined
+        : (mode === 'overlay' ? OVERLAY_CONTROL_BG : $r('sys.color.ohos_id_color_button_normal'))))
+    .systemMaterial(mode === 'tabbar' ? plainButtonMaterial(this.isDark)
+      : (plainButtonMaterialOnly() ? plainButtonMaterial(this.isDark) : usePlainButtonMaterial() ? buttonMaterial() : undefined))
+    .shadow(TOOLBAR_MANUAL_SHADOW
+      ? toolbarControlShadow()
+      : NO_TOOLBAR_SHADOW)
+    .stateStyles({ normal: { opacity: 1 }, pressed: { opacity: 0.6 } })
+    .enabled(!this.loading)
+    .accessibilityText('发送命令')
+    .onClick((): void => { this.send(); })
+    .transition(TransitionEffect.opacity(0)
+      .combine(TransitionEffect.scale({ x: 0.9, y: 0.9 }))
+      .animation({ duration: 250, curve: Curve.EaseInOut }))
   }
 
   build() {

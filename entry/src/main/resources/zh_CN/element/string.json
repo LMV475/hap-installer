@@ -13,6 +13,10 @@
       "value": "HapInstaller"
     },
     {
+      "name": "detect_gesture_reason",
+      "value": "检测握持手以适配智感握姿，提升单手操作体验"
+    },
+    {
       "name": "EntryFormAbility_desc",
       "value": "form_description"
     },
