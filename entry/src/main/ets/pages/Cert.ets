@@ -23,9 +23,21 @@ export struct Cert {
   @State pullOffsetVp: number = 0;
   @State tipText: string = '';
   @State currentName: string = '';
+  // 监听首页登录态变化（agcUser 改变说明刚登录/更换账号）
+  @StorageLink('agcUser') agcUser: string = '';
+  private lastAgcUser: string = '';
 
   aboutToAppear(): void {
+    this.lastAgcUser = this.agcUser;
     this.refresh();
+  }
+
+  onPageShow(): void {
+    // 从首页返回时，如果 agcUser 发生变化（刚登录/更换账号），重新加载证书列表
+    if (this.agcUser !== this.lastAgcUser) {
+      this.lastAgcUser = this.agcUser;
+      this.refresh();
+    }
   }
 
   private ctx(): common.UIAbilityContext {
@@ -43,7 +55,10 @@ export struct Cert {
       this.finishRefresh();
       return;
     }
-    this.loading = true;
+    // 下拉刷新时不显示 loading 文本，避免闪烁；只有首次加载才显示
+    if (!this.isRefreshing) {
+      this.loading = true;
+    }
     this.tipText = '';
     try {
       try {
@@ -333,12 +348,15 @@ export struct Cert {
           .width('100%')
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .textAlign(TextAlign.Start)
         Text('于 ' + this.fmtDate(c.expireTime) + ' 过期')
           .fontSize(11)
           .fontColor(this.isExpired(c)
             ? $r('sys.color.ohos_id_color_warning')
             : $r('sys.color.ohos_id_color_text_secondary'))
-      }.layoutWeight(1)
+      }
+      .layoutWeight(1)
+      .alignItems(HorizontalAlign.Start)
       if (this.currentName === c.certName) {
         Text('正在使用').fontSize(12)
           .fontColor($r('sys.color.ohos_id_color_emphasize'))

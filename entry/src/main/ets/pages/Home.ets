@@ -513,6 +513,7 @@ export struct Home {
         };
         AgcService.importAuth(restored);
         this.agcUser = auth.userId;
+        AppStorage.setOrCreate<string>('agcUser', auth.userId);
       }
       this.log('已载入上次配置：目标 ' + target + '，材料 ' + ready + '/3' +
         (auth.jwtToken.length > 0 ? '，登录态已恢复' : ''));
@@ -673,6 +674,7 @@ export struct Home {
       }
       const auth: AgcAuthInfo = await AgcService.exchangeToken(tempToken);
       this.agcUser = auth.userId;
+      AppStorage.setOrCreate<string>('agcUser', auth.userId);
       await this.saveConfig();
       this.status = '已登录（uid ' + auth.userId + '）';
       this.log('登录成功：uid=' + auth.userId + ' teamId=' + auth.teamId);
