@@ -229,13 +229,13 @@ export function tabBarMaterial(): uiMaterial.ImmersiveMaterial {
  * `hdsTitleBarStyle(isDark, subPage)` = GRADIENT_BLUR 提供越过栏底的渐隐模糊带（实测 MaskBlur 到 y=428，栏底 320）；
  * 幕布背景色按深浅色主题分档（见函数内注释与 spec §5.5）；`subPage` 只决定幕布模糊开关（见 blurStrategy 注释）。
  */
-export function hdsTitleBarStyle(isDark: boolean, subPage: boolean): TitleBarStyleOptions {
+export function hdsTitleBarStyle(isDark: boolean, subPage: boolean, enableBlur: boolean = true): TitleBarStyleOptions {
   const effect: SystemMaterialParams = {
     materialType: hdsMaterial.MaterialType.ADAPTIVE,
     materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE
   };
   const scrollOpts: ScrollEffectOptions = {
-    enableScrollEffect: true,
+    enableScrollEffect: enableBlur,
     scrollEffectType: ScrollEffectType.GRADIENT_BLUR
   };
   // HDS 默认 mainTitleColor 不随深色翻转（深色下字形纯黑压黑栏），必须用语义令牌显式翻转；
@@ -270,14 +270,14 @@ export function hdsTitleBarStyle(isDark: boolean, subPage: boolean): TitleBarSty
   // 根栏不给这个字段（继续走 ADAPTIVE）：它本来就模糊，动它会把 R36 已签核的首页帧改样。
   // 这里用条件赋值而不是 `subPage ? ENABLE : undefined`：显式写 undefined 与不写该键实测同帧（见 ledger 追加修订 8），
   // 但条件赋值不留一个恒为 undefined 的键，读起来更确定。
-  if (subPage) {
+  if (subPage && enableBlur) {
     style.blurStrategy = BlurStrategy.ENABLE;
   }
   return style;
 }
 
 export function hdsTitleBarOptions(mainTitle: ResourceStr, isDark: boolean,
-  size: TitleSize, subPage: boolean): HdsNavigationTitleBarOptions {
+  size: TitleSize, subPage: boolean, enableBlur: boolean = true): HdsNavigationTitleBarOptions {
   // 主标题字号：HDS 只给 TITLE_S（小号）/ TITLE_ML（中等偏大）两档，只在 MINI 模式生效（我们正是 MINI）。
   // 真机实测（SN 5MT0226114015018，density 3.375，量 "H" cap 高）：TITLE_S ≈ 20fp（cap 49px = 14.5vp）、
   // TITLE_ML ≈ 26fp（cap 64px = 19.0vp），比值 1.30。「不设字段」与显式 TITLE_S 逐像素相同（标题宽都是 395px），
@@ -292,7 +292,7 @@ export function hdsTitleBarOptions(mainTitle: ResourceStr, isDark: boolean,
     // 一级页（HdsNavigation 系统标题栏）实测本机（API 26）该字段无效果，栏体仍从状态栏下缘 y=132 起，
     // 与原生通道试 expandSafeArea 的结果一致，属平台约束（见 spec §5.2）。保留为前瞻点位。
     avoidLayoutSafeArea: true,
-    style: hdsTitleBarStyle(isDark, subPage),
+    style: hdsTitleBarStyle(isDark, subPage, enableBlur),
     content: content
   };
   return options;

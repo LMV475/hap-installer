@@ -124,7 +124,9 @@ export struct DebugDetail {
       .width('100%')
       .height('100%')
       .padding({ left: $r('sys.float.padding_level6'), right: $r('sys.float.padding_level6'),
-        top: barBottomVp(this.getUIContext(), this.safeTopPx),
+        // barBottomVp 让满标题栏底；额外 +16vp 把 HapCard 推入 GRADIENT_BLUR 模糊带渐隐段
+        //（实测越栏底 108px ≈ 32vp，栏底 y=320 → 模糊到 y=428；+16vp 到中段，模糊已明显减弱）
+        top: barBottomVp(this.getUIContext(), this.safeTopPx) + 16,
         bottom: $r('sys.float.padding_level6') })
     }
     .padding(subPageBottom(this.getUIContext(), this.safeBottomPx))
