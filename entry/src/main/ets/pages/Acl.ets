@@ -6,7 +6,7 @@ import { motion } from '@kit.MultimodalAwarenessKit';
 import { DEFAULT_ACL, loadAclList, saveAclList } from '../common/AclDefaults';
 import { HdsNavDestination, TitleSize } from '@kit.UIDesignKit';
 import { subPageBottom, barBottomVp, TOOLBAR_BAR_HEIGHT_VP, toolbarBarWidthVp } from '../common/Immersive';
-import { hdsTitleBarOptions, buttonMaterial, useSystemChrome, usePlainButtonMaterial, plainButtonMaterialOnly, plainButtonMaterial, ACL_TABBAR_TOOLBAR, ACL_TABBAR_FLOATING, ACL_TOOLBAR_OVERLAY, tabBarMaterial, OVERLAY_CONTROL_BG, TOOLBAR_MANUAL_SHADOW, toolbarControlShadow, NO_TOOLBAR_SHADOW } from '../common/MaterialPolicy';
+import { hdsTitleBarOptions, buttonMaterial, useSystemChrome, usePlainButtonMaterial, plainButtonMaterialOnly, plainButtonMaterial, ACL_TABBAR_TOOLBAR, ACL_TABBAR_FLOATING, ACL_TOOLBAR_OVERLAY, tabBarMaterial, OVERLAY_CONTROL_BG, TOOLBAR_MANUAL_SHADOW, toolbarControlShadow, NO_TOOLBAR_SHADOW, LIGHT_EFFECT_WHITE } from '../common/MaterialPolicy';
 
 /** ACL 权限列表页（对应 Flutter acl_page.dart，terminal 风格） */
 @Component
@@ -174,7 +174,8 @@ export struct Acl {
       // button_normal（#0C000000 透明黑）近乎隐形 → 用半透明白（见 MaterialPolicy.OVERLAY_CONTROL_BG）。
       .backgroundColor(mode === 'tabbar' ? Color.Transparent
         : (mode === 'overlay' ? OVERLAY_CONTROL_BG : $r('sys.color.ohos_id_color_button_normal')))
-      .systemMaterial(mode === 'tabbar' ? plainButtonMaterial(this.isDark)
+      // 输入框是"编辑位"不是"操作位"（机主 2026-10-01）：同膜同影，仅光源换白档
+      .systemMaterial(mode === 'tabbar' ? plainButtonMaterial(this.isDark, LIGHT_EFFECT_WHITE)
         : (useSystemChrome() ? buttonMaterial() : undefined))
       // 手挂小阴影（TOOLBAR_MANUAL_SHADOW）：radius 8 / offsetY 2 / 8% 黑，替代材质层大扩散 applyShadow；
       // 关闭或非 tabbar 档下发零影对象（radius 0 + 透明）保持属性链完整

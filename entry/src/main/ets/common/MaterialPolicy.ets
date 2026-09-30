@@ -147,6 +147,15 @@ export const TERMINAL_TOOLBAR_OVERLAY: boolean = false;
  */
 export const OVERLAY_CONTROL_BG: ResourceColor = '#99FFFFFF';
 
+/**
+ * 沉浸光感光源色两档（机主 2026-10-01 裁定）：
+ * - 蓝档：首页底部导航 + Terminal/Acl 底部工具条（输入框/发送键），比选中态同源的 #0A59F7 更浅一档，
+ *   深蓝叠在模糊膜上读作色块，浅蓝才像"光"；
+ * - 白档：其余材质（中性胶囊按钮、非工具条的输入框等），对齐二级页 HDS 内置返回键的白光。
+ */
+export const LIGHT_EFFECT_BLUE: ResourceColor = '#4D8BFF';
+export const LIGHT_EFFECT_WHITE: ResourceColor = '#FFFFFF';
+
 export function plainButtonMaterialOnly(): boolean {
   return usePlainButtonMaterial() && PLAIN_BUTTON_MATERIAL_ONLY;
 }
@@ -174,9 +183,13 @@ export const NO_TOOLBAR_SHADOW: ShadowOptions = { radius: 0, color: Color.Transp
  * applyShadow **true**（2026-09-30 机主复验轮）：返回键 = 近白膜 + 软阴影，阴影是它「样式」的一半，
  * 之前 false 导致按钮在浅页底上糊成隐形。THIN 膜浅色实测 241~255 ≈ 返回键正常态 252。
  * interactive+lightEffect 是光感与形变的唯一载体，摘材质=效果全没（机主已判）。
+ *
+ * 光源分档（机主 2026-10-01 裁定）：工具条**按钮**用蓝档；同条**输入框**换白档
+ * （输入框是"编辑位"不是"操作位"，白光与二级页返回键统一）——调用侧传 lightColor 切档。
  */
-export function plainButtonMaterial(isDark: boolean): uiMaterial.ImmersiveMaterial {
-  const lightEffect: uiMaterial.LightEffectOptions = { color: $r('sys.color.ohos_id_color_emphasize') };
+export function plainButtonMaterial(isDark: boolean,
+                                    lightColor: ResourceColor = LIGHT_EFFECT_BLUE): uiMaterial.ImmersiveMaterial {
+  const lightEffect: uiMaterial.LightEffectOptions = { color: lightColor };
   const options: uiMaterial.ImmersiveOptions = {
     style: uiMaterial.ImmersiveStyle.THIN,
     // 阴影改由控件侧 .shadow() 手挂（TOOLBAR_MANUAL_SHADOW），材质层大扩散影在宽胶囊上读成整条分层
@@ -204,8 +217,8 @@ const TAB_BAR_STYLE: uiMaterial.ImmersiveStyle = uiMaterial.ImmersiveStyle.REGUL
  * 观感即"看不出材质"。两者必须显式开。
  */
 export function tabBarMaterial(): uiMaterial.ImmersiveMaterial {
-  // 光感色跟底栏选中态同源（sys.color.ohos_id_color_emphasize），白光在浅色底上几乎看不出来
-  const lightEffect: uiMaterial.LightEffectOptions = { color: $r('sys.color.ohos_id_color_emphasize') };
+  // 蓝档：与工具条（plainButtonMaterial）同源，底栏与 Terminal/Acl 底键是同一组"操作位"
+  const lightEffect: uiMaterial.LightEffectOptions = { color: LIGHT_EFFECT_BLUE };
   const options: uiMaterial.ImmersiveOptions = {
     style: TAB_BAR_STYLE,
     applyShadow: globalLevelName() !== 'SMOOTH',
@@ -325,10 +338,10 @@ export function dialogMaterial(): uiMaterial.ImmersiveMaterial {
  * → 材质在这类控件上没有任何可测像素信号，静止观感完全由语义底色决定；按压光感另有一条独立死路（合成触摸 MAD=0.00）。
  * 结论：这两处的材质效果**只能上真机用真指判定**，模拟器继续翻条件是量渲染器不是量设计。
  * REGULAR 档：这类控件面积小、文字本来就是语义前景，厚档会把底色推白、对比度反而过冲。
- * 光感（lightEffect）与底栏同源色；interactive 必须显式开，否则静动无反馈（见 tabBarMaterial 注释）。
+ * 光感（lightEffect）走白档，对齐二级页 HDS 内置返回键的白光；interactive 必须显式开，否则静动无反馈（见 tabBarMaterial 注释）。
  */
 export function buttonMaterial(): uiMaterial.ImmersiveMaterial {
-  const lightEffect: uiMaterial.LightEffectOptions = { color: $r('sys.color.ohos_id_color_emphasize') };
+  const lightEffect: uiMaterial.LightEffectOptions = { color: LIGHT_EFFECT_WHITE };
   const options: uiMaterial.ImmersiveOptions = {
     style: uiMaterial.ImmersiveStyle.REGULAR,
     applyShadow: false,

@@ -7,7 +7,7 @@ import { motion } from '@kit.MultimodalAwarenessKit';
 import { HdcService } from '../common/HdcService';
 import { HdsNavDestination, TitleSize } from '@kit.UIDesignKit';
 import { subPageBottom, barBottomVp, TOOLBAR_BAR_HEIGHT_VP, toolbarBarWidthVp } from '../common/Immersive';
-import { hdsTitleBarOptions, buttonMaterial, useSystemChrome, usePlainButtonMaterial, plainButtonMaterialOnly, plainButtonMaterial, TERMINAL_TABBAR_TOOLBAR, TERMINAL_TABBAR_FLOATING, TERMINAL_TOOLBAR_OVERLAY, tabBarMaterial, OVERLAY_CONTROL_BG, TOOLBAR_MANUAL_SHADOW, toolbarControlShadow, NO_TOOLBAR_SHADOW } from '../common/MaterialPolicy';
+import { hdsTitleBarOptions, buttonMaterial, useSystemChrome, usePlainButtonMaterial, plainButtonMaterialOnly, plainButtonMaterial, TERMINAL_TABBAR_TOOLBAR, TERMINAL_TABBAR_FLOATING, TERMINAL_TOOLBAR_OVERLAY, tabBarMaterial, OVERLAY_CONTROL_BG, TOOLBAR_MANUAL_SHADOW, toolbarControlShadow, NO_TOOLBAR_SHADOW, LIGHT_EFFECT_WHITE } from '../common/MaterialPolicy';
 
 /** HDC 命令行终端页（对应 Flutter terminal_page.dart） */
 @Component
@@ -211,9 +211,10 @@ export struct Terminal {
       // button_normal（#0C000000 透明黑）近乎隐形 → 用半透明白（见 MaterialPolicy.OVERLAY_CONTROL_BG）。
       .backgroundColor(mode === 'tabbar' ? Color.Transparent
         : (mode === 'overlay' ? OVERLAY_CONTROL_BG : $r('sys.color.ohos_id_color_button_normal')))
-      // tabbar 档挂 plainButtonMaterial（THIN+applyShadow+interactive+lightEffect，与发送按钮同份）；
+      // tabbar 档挂 plainButtonMaterial（THIN+applyShadow+interactive+lightEffect，与发送按钮同膜同影）；
+      // 输入框是"编辑位"不是"操作位"（机主 2026-10-01）：仅光源换白档，发送按钮保持蓝档；
       // overlay/inline 在内容区材质 inert（真机轮 3 三证），只留语义底色 + 原生按压态。
-      .systemMaterial(mode === 'tabbar' ? plainButtonMaterial(this.isDark)
+      .systemMaterial(mode === 'tabbar' ? plainButtonMaterial(this.isDark, LIGHT_EFFECT_WHITE)
         : (useSystemChrome() ? buttonMaterial() : undefined))
       // 手挂小阴影（TOOLBAR_MANUAL_SHADOW）：radius 8 / offsetY 2 / 8% 黑，替代材质层大扩散 applyShadow
       .shadow(TOOLBAR_MANUAL_SHADOW
