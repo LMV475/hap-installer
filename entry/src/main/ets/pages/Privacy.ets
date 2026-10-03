@@ -18,8 +18,8 @@ export struct Privacy {
     HdsNavDestination() {
       Scroll(this.scrollCtrl) {
         Column({ space: 12 }) {
-          // 标题卡片
-          HapCard({ content: (): void => { this.titleCard() } })
+          // 标题（无卡片背景）
+          this.titleCard()
 
           // 使用范围
           HapCard({ content: (): void => { this.usageScope() } })

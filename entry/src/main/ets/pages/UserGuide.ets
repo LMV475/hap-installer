@@ -20,8 +20,8 @@ export struct UserGuide {
     HdsNavDestination() {
       Scroll(this.scrollCtrl) {
         Column({ space: 12 }) {
-          // 标题卡片
-          HapCard({ content: (): void => { this.titleCard() } })
+          // 标题（无卡片背景）
+          this.titleCard()
 
           // 第一步：登录华为账号
           HapCard({ content: (): void => { this.step1() } })
@@ -35,8 +35,8 @@ export struct UserGuide {
           // 第四步：调试安装 / 已签名安装
           HapCard({ content: (): void => { this.step4() } })
 
-          // 底部提示
-          HapCard({ content: (): void => { this.footer() } })
+          // 底部提示（无卡片背景）
+          this.footer()
         }
         .width('100%')
         .padding({ left: $r('sys.float.padding_level6'), right: $r('sys.float.padding_level6'),
