@@ -88,7 +88,7 @@ export struct More {
   @State resetSignVisible: boolean = false;
   private versionTaps: number = 0;
   private lastVersionTap: number = 0;
-  private appVersion: string = '1.0.0';
+  private appVersion: string = '1.0.1';
 
   aboutToAppear(): void {
     this.loadThemePrefs();
