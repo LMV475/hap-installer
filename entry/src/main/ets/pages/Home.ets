@@ -51,6 +51,9 @@ export struct Home {
   /** 材料来源：'builtin' = 默认使用内置测试链；'custom' = 用户在「签名配置」里自配置的材料 */
   @State matSource: string = 'builtin';
   @State logs: string[] = [];
+  @State logSheetOpen: boolean = false;
+  @State logLines: string[] = [];
+  private logScroller: Scroller = new Scroller();
   @State connectSheetOpen: boolean = false;
   @State signSheetOpen: boolean = false;
   @State ipPart: string = '127.0.0.1';
@@ -338,14 +341,21 @@ export struct Home {
     }
     this.busy = true;
     try {
-      const out: string = await this.exec('tconn ' + this.target.trim());
+      const t: string = this.target.trim();
+      const out: string = await this.exec('tconn ' + t);
       const ok: boolean = out.indexOf('Connect OK') >= 0;
-      this.status = ok ? '已连接 ' + this.target.trim() : '连接结果见日志';
       if (ok) {
-        addHistoryTarget(this.ctx(), this.target.trim());
+        addHistoryTarget(this.ctx(), t);
         await this.saveConfig();
       }
-      await this.doRefresh();
+      const live: number = await this.refreshTargets();
+      if (ok) {
+        this.status = live > 0 ? '已连接 ' + t : 'tconn 返回 OK，但设备未响应（见日志）';
+      } else {
+        this.status = live > 0
+          ? ('连接失败：' + t + ' 未连上，当前另有 ' + live + ' 个可用目标')
+          : '连接失败：请核对无线调试的 IP 和端口';
+      }
     } catch (e) {
       const err = e as BusinessError;
       this.log('连接异常: ' + err.message);
@@ -355,13 +365,28 @@ export struct Home {
 
   private async doRefresh(): Promise<void> {
     try {
-      const out: string = await this.exec('list targets');
-      const lines: string[] = out.split('\n').filter((l: string): boolean => l.trim().length > 0);
-      this.status = lines.length > 0 ? ('发现 ' + lines.length + ' 个目标') : '未发现目标';
+      const live: number = await this.refreshTargets();
+      this.status = live > 0 ? ('发现 ' + live + ' 个目标') : '未发现目标';
     } catch (e) {
       const err = e as BusinessError;
       this.log('刷新异常: ' + err.message);
     }
+  }
+
+  /** 真正可用的目标数：滤掉 [Empty]/[Fail] 这类提示行，并对结果探活，避免把残留会话算成目标 */
+  private async refreshTargets(): Promise<number> {
+    const out: string = await this.exec('list targets');
+    const lines: string[] = out.split('\n')
+      .map((l: string): string => l.trim())
+      .filter((l: string): boolean => l.length > 0 && l.indexOf('[') !== 0);
+    if (lines.length === 0) {
+      return 0;
+    }
+    if (!await this.probeLive()) {
+      this.log('[conn] list targets 列出 ' + lines.length + ' 条，但探活失败，按已断开的残留会话忽略');
+      return 0;
+    }
+    return lines.length;
   }
 
   /** 读取本机 UDID：hdc shell bm get --udid（需先连接无线调试目标） */
@@ -627,11 +652,12 @@ export struct Home {
     }
   }
 
-  private async doReadUdid(): Promise<void> {
+  /** 读取本机 UDID；成功返回空串，失败返回可直接展示的原因 */
+  private async doReadUdid(): Promise<string> {
     try {
       if (!await this.ensureConnected()) {
         this.log('未连接调试目标，无法读取 UDID');
-        return;
+        return '设备未连接：请在「连接设备」里核对无线调试的 IP 和端口后重连';
       }
       const out: string = await this.exec('shell bm get --udid');
       const found: RegExpMatchArray | null = out.match(new RegExp('[0-9a-fA-F]{64}'));
@@ -639,12 +665,14 @@ export struct Home {
       if (value.length === 64) {
         this.udid = value;
         this.log('本机 UDID: ' + value);
-      } else {
-        this.log('未解析到 UDID，请确认已连接调试目标');
+        return '';
       }
+      this.log('未解析到 UDID，请确认已连接调试目标');
+      return '已连接，但设备未返回 UDID（见日志）';
     } catch (e) {
       const err = e as BusinessError;
       this.log('读取 UDID 失败: ' + err.message);
+      return '读取 UDID 失败: ' + err.message;
     }
   }
 
@@ -1268,8 +1296,8 @@ export struct Home {
     return [bound, target];
   }
 
-  /** 对齐 PC autoCreateProfile：按目标包名切换 Profile，命中沙箱缓存直接复用，否则向 AGC 申请 */
-  private async ensureProfileFor(pkg: string): Promise<boolean> {
+  /** 对齐 PC autoCreateProfile：按目标包名切换 Profile，命中沙箱缓存直接复用，否则向 AGC 申请；成功返回空串，失败返回可直接展示的原因 */
+  private async ensureProfileFor(pkg: string): Promise<string> {
     const dst: string = this.ctx().filesDir + '/' + pkg.replace(/\./g, '_') + '.p7b';
     if (fileIo.accessSync(dst)) {
       this.p7bPath = dst;
@@ -1277,19 +1305,25 @@ export struct Home {
         this.log('[sign] 复用已缓存 Profile: ' + dst);
         // 缓存命中会跳过 doApplyProfile，这里仍需把证书链对齐，否则会用内置自签链签名
         await this.alignCertToAgcProfile('');
-        return true;
+        return '';
       }
     }
     if (this.udid.length === 0) {
-      await this.doReadUdid();
+      const udidErr: string = await this.doReadUdid();
+      if (udidErr.length > 0) {
+        return udidErr;
+      }
     }
     if (this.udid.length === 0) {
       this.log('[sign] 未取得本机 UDID，无法申请 Profile');
-      return false;
+      return '未取得本机 UDID，无法申请调试 Profile';
     }
     this.packageName = pkg;
     await this.doApplyProfile();
-    return this.profileBundleName() === pkg;
+    if (this.profileBundleName() !== pkg) {
+      return 'Profile 申请失败：AGC 未返回《' + pkg + '》的调试 Profile';
+    }
+    return '';
   }
 
   /** 单次签名：放到独立 ThreadWorker 里跑，主线程与看门狗定时器不受原生卡死影响 */
@@ -1366,8 +1400,9 @@ export struct Home {
     const mismatch: string[] = this.profileMismatch();
     if (mismatch.length === 2) {
       this.log('[sign] Profile 绑定《' + mismatch[0] + '》，改用目标包《' + mismatch[1] + '》的调试 Profile');
-      if (!await this.ensureProfileFor(mismatch[1])) {
-        this.status = 'Profile 申请失败';
+      const reason: string = await this.ensureProfileFor(mismatch[1]);
+      if (reason.length > 0) {
+        this.status = reason;
         return;
       }
     }
@@ -1761,31 +1796,78 @@ export struct Home {
     HapInput({ text: $bundleName, placeholder: '卸载用包名' }).width('100%')
   }
 
-  @Builder
-  logsBody() {
-    Row({ space: 8 }) {
-      Text('操作日志')
-        .fontSize(13)
-        .fontColor($r('sys.color.ohos_id_color_text_secondary'))
-        .layoutWeight(1)
-      PillButton({ label: '清空', onClickAction: (): void => { this.logs = []; } })
-    }.width('100%').margin({ bottom: $r('sys.float.padding_level3') })
-    Scroll() {
-      Column({ space: 2 }) {
-        ForEach(this.logs, (item: string, idx: number): void => {
-          Text(item)
-            .fontSize(10)
-            .fontColor($r('sys.color.ohos_id_color_text_secondary'))
-            .width('100%')
-            .textAlign(TextAlign.Start)
-        }, (item: string, idx: number): string => idx + '_' + item.length)
-      }.width('100%').alignItems(HorizontalAlign.Start)
+  /** 日志全量落在 filesDir/hapinstaller.log（log() 每条都 append），内存数组只留最近 400 条 */
+  private readLogFileTail(maxLines: number): string[] {
+    let text: string = '';
+    try {
+      text = fileIo.readTextSync(this.ctx().filesDir + '/hapinstaller.log');
+    } catch (e) {
+      const err = e as BusinessError;
+      this.log('读取日志文件失败: ' + err.message);
+      return this.logs;
     }
-    .height(220)
+    const lines: string[] = text.split('\n').filter((l: string): boolean => l.trim().length > 0);
+    return lines.length > maxLines ? lines.slice(lines.length - maxLines) : lines;
+  }
+
+  private openLogSheet(): void {
+    this.logLines = this.readLogFileTail(1000);
+    this.logSheetOpen = true;
+    setTimeout((): void => {
+      this.logScroller.scrollTo({ xOffset: 0, yOffset: 999999 });
+    }, 150);
+  }
+
+  private async doCopyLogs(): Promise<void> {
+    try {
+      const data = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, this.logLines.join('\n'));
+      await pasteboard.getSystemPasteboard().setData(data);
+      this.log('日志已复制到剪贴板');
+    } catch (e) {
+      const err = e as BusinessError;
+      this.log('复制失败: ' + err.message);
+    }
+  }
+
+  /** 点首页状态行展开；不提供清空——hapinstaller.log 是装机结果判定的依据（见 Store.repairPending） */
+  @Builder
+  logSheetBuilder() {
+    Column({ space: 10 }) {
+      Row({ space: 8 }) {
+        Text('共 ' + this.logLines.length + ' 行')
+          .fontSize(12)
+          .fontColor($r('sys.color.ohos_id_color_text_secondary'))
+          .layoutWeight(1)
+        PillButton({ label: '复制全部', onClickAction: (): void => { this.doCopyLogs(); } })
+        PillButton({ label: '刷新', onClickAction: (): void => { this.openLogSheet(); } })
+      }.width('100%')
+
+      Scroll(this.logScroller) {
+        Column({ space: 2 }) {
+          ForEach(this.logLines, (item: string): void => {
+            Text(item)
+              .fontSize(11)
+              .fontColor($r('sys.color.ohos_id_color_text_secondary'))
+              .width('100%')
+              .textAlign(TextAlign.Start)
+          }, (item: string, idx: number): string => idx + '_' + item.length)
+        }
+        .width('100%')
+        .alignItems(HorizontalAlign.Start)
+      }
+      .layoutWeight(1)
+      .width('100%')
+      .scrollBar(BarState.Auto)
+      .align(Alignment.TopStart)
+      .backgroundColor($r('sys.color.ohos_id_color_sub_background'))
+      .padding($r('sys.float.padding_level3'))
+      .borderRadius($r('sys.float.corner_radius_level4'))
+    }
     .width('100%')
-    .backgroundColor($r('sys.color.ohos_id_color_sub_background'))
-    .padding($r('sys.float.padding_level3'))
-    .borderRadius($r('sys.float.corner_radius_level4'))
+    .height('100%')
+    .alignItems(HorizontalAlign.Start)
+    .padding({ left: $r('sys.float.padding_level6'), right: $r('sys.float.padding_level6'),
+      bottom: $r('sys.float.padding_level6') })
   }
 
   @Builder
@@ -1972,12 +2054,29 @@ export struct Home {
         backgroundColor: useSystemChrome() ? Color.Transparent : $r('sys.color.ohos_id_color_card_bg')
       })
 
-      Text(this.status)
-        .fontSize(12)
-        .fontColor(this.kernelReady
-          ? $r('sys.color.ohos_id_color_text_secondary')
-          : $r('sys.color.ohos_id_color_warning'))
-        .width('100%')
+      Row({ space: 6 }) {
+        Text(this.status)
+          .fontSize(12)
+          .fontColor(this.kernelReady
+            ? $r('sys.color.ohos_id_color_text_secondary')
+            : $r('sys.color.ohos_id_color_warning'))
+          .layoutWeight(1)
+        Text('日志')
+          .fontSize(12)
+          .fontColor($r('sys.color.ohos_id_color_text_tertiary'))
+        SymbolGlyph($r('sys.symbol.chevron_right'))
+          .fontSize(12)
+          .fontColor([$r('sys.color.ohos_id_color_text_tertiary')])
+      }
+      .width('100%')
+      .padding({ top: 8, bottom: 8 })
+      .onClick((): void => { this.openLogSheet(); })
+      .bindSheet($$this.logSheetOpen, this.logSheetBuilder(), {
+        detents: [SheetSize.MEDIUM, SheetSize.LARGE],
+        title: { title: '操作日志' },
+        systemMaterial: useSystemChrome() ? sheetMaterial() : undefined,
+        backgroundColor: useSystemChrome() ? Color.Transparent : $r('sys.color.ohos_id_color_card_bg')
+      })
 
       if (this.canStartDebug()) {
         Column({ space: 8 }) {
