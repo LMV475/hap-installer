@@ -5,9 +5,9 @@ import { BusinessError } from '@kit.BasicServicesKit';
 import { FrameCallback } from '@kit.ArkUI';
 import { motion } from '@kit.MultimodalAwarenessKit';
 import { HdcService } from '../common/HdcService';
-import { HdsNavDestination, TitleSize } from '@kit.UIDesignKit';
+import { HdsNavDestination } from '@kit.UIDesignKit';
 import { subPageBottom, barBottomVp, TOOLBAR_BAR_HEIGHT_VP, toolbarBarWidthVp } from '../common/Immersive';
-import { hdsTitleBarOptions, buttonMaterial, useSystemChrome, usePlainButtonMaterial, plainButtonMaterialOnly, plainButtonMaterial, TERMINAL_TABBAR_TOOLBAR, TERMINAL_TABBAR_FLOATING, TERMINAL_TOOLBAR_OVERLAY, tabBarMaterial, OVERLAY_CONTROL_BG, TOOLBAR_MANUAL_SHADOW, toolbarControlShadow, NO_TOOLBAR_SHADOW, LIGHT_EFFECT_WHITE } from '../common/MaterialPolicy';
+import { hdsTitleBarOptions, buttonMaterial, useSystemChrome, usePlainButtonMaterial, plainButtonMaterialOnly, plainButtonMaterial, TERMINAL_TABBAR_TOOLBAR, TERMINAL_TABBAR_FLOATING, TERMINAL_TOOLBAR_OVERLAY, tabBarMaterial, OVERLAY_CONTROL_BG, TOOLBAR_MANUAL_SHADOW, toolbarControlShadow, NO_TOOLBAR_SHADOW, LIGHT_EFFECT_WHITE, chromeAttributesSupported, ButtonChromeModifier, TextInputChromeModifier, FloatingTabBarModifier, TitleSize } from '../common/MaterialPolicy';
 
 /** HDC 命令行终端页（对应 Flutter terminal_page.dart） */
 @Component
@@ -110,7 +110,10 @@ export struct Terminal {
         .borderRadius($r('sys.float.corner_radius_level8'))
         .backgroundColor(plainButtonMaterialOnly() ? undefined : $r('sys.color.ohos_id_color_button_normal'))
         .fontColor($r('sys.color.ohos_id_color_emphasize'))
-        .systemMaterial(plainButtonMaterialOnly() ? plainButtonMaterial(this.isDark) : usePlainButtonMaterial() ? buttonMaterial() : undefined)
+        // .systemMaterial（@since 26）挪进 ButtonChromeModifier 按能力位下发（见 MaterialPolicy 低版本兼容层）
+        .attributeModifier(new ButtonChromeModifier(
+          plainButtonMaterialOnly() ? plainButtonMaterial(this.isDark)
+            : usePlainButtonMaterial() ? buttonMaterial() : undefined, undefined))
         .stateStyles({ normal: { opacity: 1 }, pressed: { opacity: 0.6 } })
         .accessibilityText('加载日志')
         .onClick((): void => { this.loadLog(); })
@@ -120,7 +123,10 @@ export struct Terminal {
         .borderRadius($r('sys.float.corner_radius_level8'))
         .backgroundColor(plainButtonMaterialOnly() ? undefined : $r('sys.color.ohos_id_color_button_normal'))
         .fontColor($r('sys.color.ohos_id_color_emphasize'))
-        .systemMaterial(plainButtonMaterialOnly() ? plainButtonMaterial(this.isDark) : usePlainButtonMaterial() ? buttonMaterial() : undefined)
+        // .systemMaterial（@since 26）挪进 ButtonChromeModifier 按能力位下发（见 MaterialPolicy 低版本兼容层）
+        .attributeModifier(new ButtonChromeModifier(
+          plainButtonMaterialOnly() ? plainButtonMaterial(this.isDark)
+            : usePlainButtonMaterial() ? buttonMaterial() : undefined, undefined))
         .stateStyles({ normal: { opacity: 1 }, pressed: { opacity: 0.6 } })
         .accessibilityText('清空输出')
         .onClick((): void => { this.results = []; })
@@ -214,12 +220,13 @@ export struct Terminal {
       // tabbar 档挂 plainButtonMaterial（THIN+applyShadow+interactive+lightEffect，与发送按钮同膜同影）；
       // 输入框是"编辑位"不是"操作位"（机主 2026-10-01）：仅光源换白档，发送按钮保持蓝档；
       // overlay/inline 在内容区材质 inert（真机轮 3 三证），只留语义底色 + 原生按压态。
-      .systemMaterial(mode === 'tabbar' ? plainButtonMaterial(this.isDark, LIGHT_EFFECT_WHITE)
-        : (useSystemChrome() ? buttonMaterial() : undefined))
+      // 材质 + 手挂小阴影一并交给 TextInputChromeModifier，**内部顺序仍是材质 → 小阴影**，
+      // 与改前链上 .systemMaterial() → .shadow() 的先后一致（低版本只跳材质，阴影照发）。
       // 手挂小阴影（TOOLBAR_MANUAL_SHADOW）：radius 8 / offsetY 2 / 8% 黑，替代材质层大扩散 applyShadow
-      .shadow(TOOLBAR_MANUAL_SHADOW
-        ? toolbarControlShadow()
-        : NO_TOOLBAR_SHADOW)
+      .attributeModifier(new TextInputChromeModifier(
+        mode === 'tabbar' ? plainButtonMaterial(this.isDark, LIGHT_EFFECT_WHITE)
+          : (useSystemChrome() ? buttonMaterial() : undefined),
+        TOOLBAR_MANUAL_SHADOW ? toolbarControlShadow() : NO_TOOLBAR_SHADOW))
       .stateStyles({ normal: { opacity: 1 }, pressed: { opacity: 0.6 } })
       .enabled(!this.loading)
       .onChange((v: string): void => { this.cmd = v; })
@@ -247,14 +254,14 @@ export struct Terminal {
     .borderRadius(22)
     // TabBar 生效区内膜会盖住 backgroundColor，表面色不可调 → 不下发，样式走 plainButtonMaterial 的阴影；
     // overlay/inline 在内容区底色可调；overlay 浮在暗色模糊条上，button_normal 透明黑近乎隐形 → 半透明白
-    .backgroundColor(mode === 'tabbar' ? undefined
+    // API<26 无材质膜（Button 露出系统蓝底，emphasize 蓝图标蓝底不可见）→ 按 inline 档给语义底色
+    .backgroundColor((mode === 'tabbar' && chromeAttributesSupported()) ? undefined
       : (plainButtonMaterialOnly() ? undefined
         : (mode === 'overlay' ? OVERLAY_CONTROL_BG : $r('sys.color.ohos_id_color_button_normal'))))
-    .systemMaterial(mode === 'tabbar' ? plainButtonMaterial(this.isDark)
-      : (plainButtonMaterialOnly() ? plainButtonMaterial(this.isDark) : usePlainButtonMaterial() ? buttonMaterial() : undefined))
-    .shadow(TOOLBAR_MANUAL_SHADOW
-      ? toolbarControlShadow()
-      : NO_TOOLBAR_SHADOW)
+    .attributeModifier(new ButtonChromeModifier(
+      mode === 'tabbar' ? plainButtonMaterial(this.isDark)
+        : (plainButtonMaterialOnly() ? plainButtonMaterial(this.isDark) : usePlainButtonMaterial() ? buttonMaterial() : undefined),
+      TOOLBAR_MANUAL_SHADOW ? toolbarControlShadow() : NO_TOOLBAR_SHADOW))
     .stateStyles({ normal: { opacity: 1 }, pressed: { opacity: 0.6 } })
     .enabled(!this.loading)
     .accessibilityText('发送命令')
@@ -305,8 +312,10 @@ export struct Terminal {
         // barFloatingStyle 仅在 barOverlap(true) 时生效（Task 8 实测前置条件）；
         // barBottomMargin 0 —— HdsNavDestination 的 subPageBottom 已把 Tabs 盒上移 px2vp(safeBottom)+12，
         // 与首页胶囊同高，不再叠一次。
-        .barOverlap(TERMINAL_TABBAR_FLOATING)
-        .barFloatingStyle({
+        // 悬浮栏属性通道（Tabs.barFloatingStyle，@since 26）由 FloatingTabBarModifier 按能力位下发；
+        // API<26 拿不到悬浮栏，barOverlap 同步取 false → 回到不重叠的满宽栏体。
+        .barOverlap(TERMINAL_TABBAR_FLOATING && chromeAttributesSupported())
+        .attributeModifier(new FloatingTabBarModifier({
           barWidth: {
             smallBarWidth: toolbarBarWidthVp(this.getUIContext(), this.winWidthPx),
             mediumBarWidth: toolbarBarWidthVp(this.getUIContext(), this.winWidthPx),
@@ -315,7 +324,7 @@ export struct Terminal {
           barBottomMargin: 0,
           adaptToHandedness: false,
           systemMaterial: tabBarMaterial()
-        })
+        }))
         .width('100%')
         .height('100%')
       } else {

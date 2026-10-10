@@ -6,9 +6,9 @@ import { AgcService } from '../common/AgcService';
 import { HdcService } from '../common/HdcService';
 import { loadHistoryTargets, clearHistoryTargets } from '../common/HistoryTargets';
 import { HapCard } from '../components/HapCard';
-import { HdsNavDestination, TitleSize } from '@kit.UIDesignKit';
+import { HdsNavDestination } from '@kit.UIDesignKit';
 import { subPageBottom, barBottomVp } from '../common/Immersive';
-import { hdsTitleBarOptions } from '../common/MaterialPolicy';
+import { hdsTitleBarOptions, TitleSize } from '../common/MaterialPolicy';
 
 /** 团队设备页（对应 Flutter team_device_page.dart：团队 / 可用设备 / 历史连接 三张卡片） */
 @Component

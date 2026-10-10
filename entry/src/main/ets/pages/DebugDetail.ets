@@ -5,9 +5,9 @@ import { FrameCallback } from '@kit.ArkUI';
 import { HistoryRow } from '../common/Store';
 import { HapCard } from '../components/HapCard';
 import { PillButton } from '../components/PillButton';
-import { HdsNavDestination, TitleSize } from '@kit.UIDesignKit';
+import { HdsNavDestination } from '@kit.UIDesignKit';
 import { subPageBottom, barBottomVp } from '../common/Immersive';
-import { hdsTitleBarOptions } from '../common/MaterialPolicy';
+import { hdsTitleBarOptions, TitleSize } from '../common/MaterialPolicy';
 
 /** 调试详情页（对应 Flutter debug_detail_page.dart）：单次调试的元信息 + 完整日志 */
 @Component

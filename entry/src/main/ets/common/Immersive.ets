@@ -81,6 +81,29 @@ export function bottomInsetVp(ui: UIContext, safeBottomPx: number): number {
 }
 
 /**
+ * API<26 经典满宽底栏的底部安全边距开关（2026-10-10）：true = 底栏盒整体让出系统导航条带；
+ * false = 回到「栏体贴到窗口物理底」的上一版行为（保留可退路，不改悬浮档）。
+ */
+export const LEGACY_CLASSIC_BAR_BOTTOM_INSET: boolean = true;
+
+/**
+ * 一级页底栏的「离屏幕底边」让位量（vp），按能力位分档：
+ * - 悬浮档（API≥26）返 **0** —— 离底由 `Tabs.barFloatingStyle.barBottomMargin`
+ *   （= px2vp(safeBottomPx) + PILL_BOTTOM_GAP_VP）负责，这里再叠一次等于让两段。
+ * - 经典档（API<26）必须自己让：`FloatingTabBarModifier` 在该档不下发 barFloatingStyle，
+ *   Tabs 回落成满宽栏、栏体贴在 Tabs 盒底，而窗口是 setWindowLayoutFullScreen(true) 的，
+ *   盒底 = 窗口物理底 = 导航条之下。模拟器（127.0.0.1:5555，1280×2832）实测：
+ *   `TabBar [0,2636][1280,2832]`、页签文字底边 2797，手势指示条像素带 2796..2816 —— 零间距逐像素相接。
+ *   让位量取 safeBottomPx 本身（满宽栏与指示条上缘相切是系统应用的常规观感，不再叠 12vp 悬浮间隙）。
+ */
+export function classicBarBottomInsetVp(ui: UIContext, safeBottomPx: number, floating: boolean): number {
+  if (floating || !LEGACY_CLASSIC_BAR_BOTTOM_INSET) {
+    return 0;
+  }
+  return ui.px2vp(safeBottomPx);
+}
+
+/**
  * 二级页（HdsNavDestination）内容让位量的两半，分别挂在两个节点上 —— 这点是实测出来的：
  *
  * 顶＝barBottomVp（状态栏 + 栏体 ≈ 95vp），**只能挂在内容容器上**。

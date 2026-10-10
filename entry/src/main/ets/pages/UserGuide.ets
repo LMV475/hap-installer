@@ -1,6 +1,6 @@
-import { HdsNavDestination, TitleSize } from '@kit.UIDesignKit';
+import { HdsNavDestination } from '@kit.UIDesignKit';
 import { subPageBottom, barBottomVp, PILL_BOTTOM_GAP_VP } from '../common/Immersive';
-import { hdsTitleBarOptions } from '../common/MaterialPolicy';
+import { hdsTitleBarOptions, TitleSize } from '../common/MaterialPolicy';
 import { HapCard } from '../components/HapCard';
 import { PillButton } from '../components/PillButton';
 import { UIContext } from '@kit.ArkUI';

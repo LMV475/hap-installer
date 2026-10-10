@@ -4,9 +4,9 @@ import { fileIo } from '@kit.CoreFileKit';
 import { preferences } from '@kit.ArkData';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { BusinessError } from '@kit.BasicServicesKit';
-import { HdsNavDestination, TitleSize } from '@kit.UIDesignKit';
+import { HdsNavDestination } from '@kit.UIDesignKit';
 import { subPageBottom, barBottomVp } from '../common/Immersive';
-import { hdsTitleBarOptions, buttonMaterial, useSystemChrome } from '../common/MaterialPolicy';
+import { hdsTitleBarOptions, buttonMaterial, useSystemChrome, ButtonChromeModifier, TitleSize } from '../common/MaterialPolicy';
 
 // AGC 通用入口：不硬编码具体项目 id，登录后由用户在控制台里进入自己的项目
 const AGC_URL: string = 'https://developer.huawei.com/consumer/cn/service/josp/agc/index.html';
@@ -118,7 +118,9 @@ export struct CertWeb {
             .fontSize(13)
             .backgroundColor($r('sys.color.ohos_id_color_sub_background'))
             .fontColor($r('sys.color.ohos_id_color_text_primary'))
-            .systemMaterial(useSystemChrome() ? buttonMaterial() : undefined)
+            // .systemMaterial（@since 26）挪进 ButtonChromeModifier 按能力位下发（见 MaterialPolicy 低版本兼容层）
+            .attributeModifier(new ButtonChromeModifier(
+              useSystemChrome() ? buttonMaterial() : undefined, undefined))
             .onClick((): void => {
               this.pathStack.pop();
             })

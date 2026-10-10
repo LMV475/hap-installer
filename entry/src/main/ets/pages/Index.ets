@@ -12,9 +12,10 @@ import { DebugDetail } from './DebugDetail';
 import { Breakpoint, syncBreakpoint } from '../components/BreakpointSystem';
 import { PILL_BOTTOM_GAP_VP, SYSTEM_TAB_BAR_VP,
   TAB_BAR_WIDTH_SM_VP, TAB_BAR_WIDTH_MD_VP,
-  TAB_BAR_WIDTH_LG_VP } from '../common/Immersive';
-import { tabBarMaterial, hdsTitleBarOptions } from '../common/MaterialPolicy';
-import { HdsNavigation, HdsNavigationTitleMode, TitleSize } from '@kit.UIDesignKit';
+  TAB_BAR_WIDTH_LG_VP, classicBarBottomInsetVp } from '../common/Immersive';
+import { tabBarMaterial, hdsTitleBarOptions, TitleSize,
+  chromeAttributesSupported, FloatingTabBarModifier } from '../common/MaterialPolicy';
+import { HdsNavigation, HdsNavigationTitleMode } from '@kit.UIDesignKit';
 
 @Entry
 @Component
@@ -106,9 +107,12 @@ struct Index {
     .barMode(BarMode.Fixed)
     .barHeight(SYSTEM_TAB_BAR_VP)
     .barBackgroundColor(Color.Transparent)
-    // barFloatingStyle 仅在页签栏与内容重叠（barOverlap(true)）时生效
-    .barOverlap(true)
-    .barFloatingStyle({
+    // barFloatingStyle 仅在页签栏与内容重叠（barOverlap(true)）时生效；
+    // 悬浮栏属性通道（Tabs.barFloatingStyle，@since 26）在 API<26 运行时不存在，
+    // 由 FloatingTabBarModifier 按能力位下发，低版本回落成经典满宽栏 → barOverlap 同步取 false，
+    // 否则满宽透明栏会压在内容上（内容底 inset 是按悬浮档算的）。
+    .barOverlap(chromeAttributesSupported())
+    .attributeModifier(new FloatingTabBarModifier({
       barWidth: {
         smallBarWidth: TAB_BAR_WIDTH_SM_VP,
         mediumBarWidth: TAB_BAR_WIDTH_MD_VP,
@@ -119,6 +123,18 @@ struct Index {
       // 单手模式无法经 shell 切换验证，按 Task 8 Step 7③ 置 false 并在 spec 记录
       adaptToHandedness: false,
       systemMaterial: tabBarMaterial()
+    }))
+    // 低版本经典满宽档：栏体贴在 Tabs 盒底，而窗口是全屏布局的，盒底在系统导航条之下，
+    // 所以整盒要按导航条避让区上抬；悬浮档该值恒 0（离底已由上面的 barBottomMargin 负责）。
+    // 用 padding 而不是 margin：Tabs 上 `.margin({bottom:28vp})` 实测**完全无效**
+    //（margin 版 dump 仍为 Tabs [0,137][1280,2832]、TabBar [0,2636][1280,2832]），因为该子节点的
+    // height('100%') 在 HdsNavigation 内容区里按拉伸处理，margin 落在盒外被吞；padding 缩的是
+    // 内部布局区，满宽栏随之内收到 padding 上缘。实测（本模拟器 safe area bottom=98px）：
+    // TabBar [0,2636][1280,2832] → [0,2538][1280,2735]，页签文字底边 2797 → 2699，
+    // 与手势指示条像素带 2796..2816 之间空出 97px。≥26 档反向取证：临时把
+    // CHROME_ATTR_MIN_API 设 21 强制 chrome=true，TabBar 逐字回到 [0,2636][1280,2832]。
+    .padding({
+      bottom: classicBarBottomInsetVp(this.getUIContext(), this.safeBottomPx, chromeAttributesSupported())
     })
     .width('100%')
     .height('100%')

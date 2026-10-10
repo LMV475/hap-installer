@@ -1,4 +1,4 @@
-import { buttonMaterial, useSystemChrome } from '../common/MaterialPolicy';
+import { buttonMaterial, useSystemChrome, ButtonChromeModifier } from '../common/MaterialPolicy';
 
 export type PillButtonVariant = 'primary' | 'secondary' | 'danger';
 
@@ -41,7 +41,9 @@ export struct PillButton {
       .fontColor(this.fgColor())
       .borderRadius($r('sys.float.corner_radius_level8'))
       .enabled(this.enabled_)
-      .systemMaterial(this.usesMaterial() ? buttonMaterial() : undefined)
+      // .systemMaterial（@since 26）挪进 ButtonChromeModifier 按能力位下发（见 MaterialPolicy 低版本兼容层）
+      .attributeModifier(new ButtonChromeModifier(
+        this.usesMaterial() ? buttonMaterial() : undefined, undefined))
       .onClick((): void => { this.onClickAction(); })
   }
 }

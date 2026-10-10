@@ -1,12 +1,168 @@
 import { hilog } from '@kit.PerformanceAnalysisKit';
+import { deviceInfo } from '@kit.BasicServicesKit';
 import { uiMaterial } from '@kit.ArkUI';
-import { hdsMaterial, SystemMaterialParams, ScrollEffectType, ScrollEffectOptions,
+import { SystemMaterialParams, ScrollEffectType, ScrollEffectOptions,
   TitleBarStyleOptions, HdsNavigationTitleBarOptions, HdsNavigationTitle, TitleBarContentOptions,
   HdsNavigationTitleStyle, HdsTitleBarContentStyle, HdsNavigationTitleBarStyle,
-  HdsNavigationBackgroundStyle, TitleSize, BlurStrategy
+  HdsNavigationBackgroundStyle, BlurStrategy
 } from '@kit.UIDesignKit';
 
+/**
+ * TitleSize 本地等价枚举——SDK 原始定义 @since 6.1.0(23)，模拟器 6.0.0.112 运行时模块
+ * @hms:hds.hdsBaseComponent 未导出该符号，导致模块加载即 SyntaxError。
+ * 值与 SDK 完全一致：TITLE_S = 0, TITLE_ML = 1。
+ */
+export enum TitleSize {
+  TITLE_S = 0,
+  TITLE_ML = 1
+}
+
+/**
+ * hdsMaterial 本地等价常量——SDK 原始定义 @since 6.1.0(23)，模拟器 6.0.0.112 运行时模块
+ * @hms:hds.hdsMaterial 不可用。仅提供代码中实际使用的两个 ADAPTIVE 值（均为 10）。
+ */
+const HDS_MATERIAL_TYPE_ADAPTIVE: number = 10;
+const HDS_MATERIAL_LEVEL_ADAPTIVE: number = 10;
+
+/**
+ * 低版本（API < 26）兼容层。取证链条（2026-10-09 模拟器轮）：
+ *   - `BaseAttribute.systemMaterial`（component/common.d.ts:22658）与
+ *     `TabsAttribute.barFloatingStyle`（component/tabs.d.ts:1683）**都是 @since 26.0.0**，
+ *     而 compatible 仍是 6.0.1(21)（机主裁定保持 21，见本文件 HDS 顶栏注释）；
+ *   - 本机运行时 emulator 6.0.0.112（const.ohos.apiversion=21）里这两个方法在控件实例上不存在，
+ *     链式调用直接抛 `TypeError: undefined is not callable`，Index.bodyContent 首帧即 JSCrash
+ *     （jscrash-…-20261009194828328.log，栈顶 Index.ets:111 = .barFloatingStyle）；
+ *   - ArkTS 的 build() 属性链里不能写 if，运行时按需下发属性的唯一 sanctioned 通道是
+ *     动态属性 `attributeModifier`（@since 12，低版本可用）。
+ *
+ * 于是把这两条属性从链上挪进 modifier：**≥26 逐条按原顺序下发**（材质 → 手挂小阴影，
+ * 与改前链序一致，真机已签核观感不动）；**<26 只跳过材质、小阴影照发** → 回到上材质之前的档，
+ * 且不崩。`barOverlap`（@since 10）本身低版本可用，但悬浮栏没了它就没意义，
+ * 由调用侧按同一能力位取 false（经典满宽栏，内容不被压住）。
+ */
+const CHROME_ATTR_MIN_API: number = 26;
+
+/** 运行时 API 版本；deviceInfo 是基础 kit，低版本读取安全（读失败按 0 处理 = 不支持）。 */
+export function runtimeApiVersion(): number {
+  try {
+    return deviceInfo.sdkApiVersion;
+  } catch (e) {
+    hilog.error(0x0000, 'HapInstaller', 'deviceInfo.sdkApiVersion threw: %{public}s', String(e));
+    return 0;
+  }
+}
+
+/** 系统材质 / 悬浮栏属性通道（.systemMaterial、Tabs.barFloatingStyle）是否可用 —— 需 API ≥ 26 */
+export function chromeAttributesSupported(): boolean {
+  return runtimeApiVersion() >= CHROME_ATTR_MIN_API;
+}
+
+/**
+ * 低版本顶栏实心档开关（2026-10-10 模拟器 5555 取证）：
+ * HDS 顶栏的渐隐幕布（`scrollEffectType: GRADIENT_BLUR` + `maskExtraHeight`）与
+ * `systemMaterialEffect` 在 API 21 运行时**一像素都不画**（fling 帧 fling_094818.jpeg：
+ * 栏带内「显示」「随系统深色模式」与标题「更多」逐字锐利叠印，栏带内外边缘能量同档 = 无模糊信号），
+ * 而内容侧仍按「穿过栏下」布局滚（`Immersive.topInsetVp` 只是内容内边距，不是容器 padding）
+ * → 滚动时文字压文字。本档把栏体底色换成实心语义令牌，滚动内容到栏底即被挡（经典非沉浸栏观感）。
+ * true = 仅在 <26 生效；≥26 走原幕布档，逐像素不动。false = 低版本维持现状（透栏 + 叠字）。
+ */
+export const LEGACY_SOLID_TITLE_BAR: boolean = true;
+
+/**
+ * 实心档栏底色：与 `Index.build()` 里 `HdsNavigation.backgroundColor` 同一令牌
+ * （浅档实测 242 / 深档自动翻转），栏带与页底同色 → 观感是「栏把内容裁掉」而不是「栏上贴了一块板」。
+ * 取函数而非常量：本文件其余 `$r()` 都在调用侧求值，避免模块加载期新增一个资源解析点。
+ */
+export function legacyTitleBarBg(): ResourceColor {
+  return $r('sys.color.ohos_id_color_sub_background');
+}
+
+/** 顶栏是否走实心档 —— 与材质通道共用同一能力位（<26 幕布不画，实心档才有意义）。 */
+export function legacySolidTitleBar(): boolean {
+  return LEGACY_SOLID_TITLE_BAR && !chromeAttributesSupported();
+}
+
+/** Button 系（PillButton / Acl / Terminal / CertWeb）材质 + 小阴影的动态属性载体。 */
+export class ButtonChromeModifier implements AttributeModifier<ButtonAttribute> {
+  private material: uiMaterial.ImmersiveMaterial | undefined;
+  private shadow: ShadowOptions | undefined;
+
+  constructor(material: uiMaterial.ImmersiveMaterial | undefined, shadow: ShadowOptions | undefined) {
+    this.material = material;
+    this.shadow = shadow;
+  }
+
+  applyNormalAttribute(instance: ButtonAttribute): void {
+    if (chromeAttributesSupported()) {
+      try {
+        instance.systemMaterial(this.material);
+      } catch (e) {
+        hilog.error(0x0000, 'HapInstaller', 'Button.systemMaterial threw: %{public}s', String(e));
+      }
+    }
+    if (this.shadow !== undefined) {
+      instance.shadow(this.shadow);
+    }
+  }
+}
+
+/** TextInput 系（Acl / Terminal 工具条输入框）材质 + 小阴影的动态属性载体。 */
+export class TextInputChromeModifier implements AttributeModifier<TextInputAttribute> {
+  private material: uiMaterial.ImmersiveMaterial | undefined;
+  private shadow: ShadowOptions | undefined;
+
+  constructor(material: uiMaterial.ImmersiveMaterial | undefined, shadow: ShadowOptions | undefined) {
+    this.material = material;
+    this.shadow = shadow;
+  }
+
+  applyNormalAttribute(instance: TextInputAttribute): void {
+    if (chromeAttributesSupported()) {
+      try {
+        instance.systemMaterial(this.material);
+      } catch (e) {
+        hilog.error(0x0000, 'HapInstaller', 'TextInput.systemMaterial threw: %{public}s', String(e));
+      }
+    }
+    if (this.shadow !== undefined) {
+      instance.shadow(this.shadow);
+    }
+  }
+}
+
+/** Tabs 悬浮底栏（首页胶囊 + Acl/Terminal 工具条）的动态属性载体。 */
+export class FloatingTabBarModifier implements AttributeModifier<TabsAttribute> {
+  private style: FloatingTabBarStyle;
+
+  constructor(style: FloatingTabBarStyle) {
+    this.style = style;
+  }
+
+  applyNormalAttribute(instance: TabsAttribute): void {
+    if (!chromeAttributesSupported()) {
+      return;
+    }
+    try {
+      instance.barFloatingStyle(this.style);
+    } catch (e) {
+      hilog.error(0x0000, 'HapInstaller', 'Tabs.barFloatingStyle threw: %{public}s', String(e));
+    }
+  }
+}
+
+/**
+ * `uiMaterial` 命名空间（@since 26.0.0）在低版本运行时是 **undefined**：读它的任何成员都抛
+ * `TypeError: Cannot read property … of undefined`。此前只靠各函数的 try/catch 兜，结果每次重渲染都
+ * 落一条 error（2026-10-10 取证：一次「冷启动 + 切页 + 开抽屉 + 开弹窗」= 6× isImmersiveMaterialSupported
+ * threw + 2× tabBarMaterial threw，Acl/Terminal 的 tabbar 档还会再加 plainButtonMaterial）。
+ * 这里在**入口**按能力位早退：低版本根本不碰 uiMaterial → 零异常零 error 日志；
+ * ≥26 逐行走原路径（含 try/catch 第二层，防「api≥26 但材质被系统关掉/命名空间缺失」那类设备）。
+ * 返回值语义与原来「抛异常被 catch」完全一致：材质 undefined = 该点位不下发材质。
+ */
 export function isImmersiveSupported(): boolean {
+  if (!chromeAttributesSupported()) {
+    return false;
+  }
   try {
     return uiMaterial.isImmersiveMaterialSupported();
   } catch (e) {
@@ -15,7 +171,13 @@ export function isImmersiveSupported(): boolean {
   }
 }
 
+/** 低版本档下探针函数的返回值（不再读 uiMaterial，也不再出现 THREW(...) 这种噪音串） */
+const MATERIAL_NOT_SUPPORTED: string = 'UNSUPPORTED(api<26)';
+
 export function globalLevelName(): string {
+  if (!chromeAttributesSupported()) {
+    return MATERIAL_NOT_SUPPORTED;
+  }
   try {
     const level: uiMaterial.MaterialLevel = uiMaterial.getGlobalMaterialLevel();
     if (level === uiMaterial.MaterialLevel.EXQUISITE) {
@@ -34,6 +196,9 @@ export function globalLevelName(): string {
 }
 
 export function materialInfoStateName(): string {
+  if (!chromeAttributesSupported()) {
+    return MATERIAL_NOT_SUPPORTED;
+  }
   try {
     const info: uiMaterial.MaterialInfo = uiMaterial.getMaterialInfo();
     if (info.state === uiMaterial.MaterialState.ENABLE) {
@@ -50,7 +215,8 @@ export function materialInfoStateName(): string {
 
 export function logMaterialCapabilities(): void {
   hilog.info(0x0000, 'HapInstaller',
-    'material probe: supported=%{public}s level=%{public}s state=%{public}s',
+    'material probe: api=%{public}s chrome=%{public}s supported=%{public}s level=%{public}s state=%{public}s',
+    String(runtimeApiVersion()), String(chromeAttributesSupported()),
     String(isImmersiveSupported()), globalLevelName(), materialInfoStateName());
 }
 
@@ -188,16 +354,24 @@ export const NO_TOOLBAR_SHADOW: ShadowOptions = { radius: 0, color: Color.Transp
  * （输入框是"编辑位"不是"操作位"，白光与二级页返回键统一）——调用侧传 lightColor 切档。
  */
 export function plainButtonMaterial(isDark: boolean,
-                                    lightColor: ResourceColor = LIGHT_EFFECT_BLUE): uiMaterial.ImmersiveMaterial {
-  const lightEffect: uiMaterial.LightEffectOptions = { color: lightColor };
-  const options: uiMaterial.ImmersiveOptions = {
-    style: uiMaterial.ImmersiveStyle.THIN,
-    // 阴影改由控件侧 .shadow() 手挂（TOOLBAR_MANUAL_SHADOW），材质层大扩散影在宽胶囊上读成整条分层
-    applyShadow: !TOOLBAR_MANUAL_SHADOW,
-    interactive: true,
-    lightEffect: lightEffect
-  };
-  return new uiMaterial.ImmersiveMaterial(options);
+                                    lightColor: ResourceColor = LIGHT_EFFECT_BLUE): uiMaterial.ImmersiveMaterial | undefined {
+  if (!chromeAttributesSupported()) {
+    return undefined;
+  }
+  try {
+    const lightEffect: uiMaterial.LightEffectOptions = { color: lightColor };
+    const options: uiMaterial.ImmersiveOptions = {
+      style: uiMaterial.ImmersiveStyle.THIN,
+      // 阴影改由控件侧 .shadow() 手挂（TOOLBAR_MANUAL_SHADOW），材质层大扩散影在宽胶囊上读成整条分层
+      applyShadow: !TOOLBAR_MANUAL_SHADOW,
+      interactive: true,
+      lightEffect: lightEffect
+    };
+    return new uiMaterial.ImmersiveMaterial(options);
+  } catch (e) {
+    hilog.error(0x0000, 'HapInstaller', 'plainButtonMaterial threw: %{public}s', String(e));
+    return undefined;
+  }
 }
 
 export function usePlainButtonMaterial(): boolean {
@@ -207,8 +381,8 @@ export function usePlainButtonMaterial(): boolean {
 /**
  * 底栏材质档位。EXQUISITE→THICK 档在本机实测过白：同一次 fling 前后，栏外内容带帧间 MAD=8.11、
  * 栏内仅 2.55（透色响应约 31%），栏内均值 247/255，观感即"一颗不透明白胶囊"；REGULAR 档透色响应约 78%。
+ * 延迟求值：uiMaterial 在部分模拟器（如 6.0.0.112）运行时为 undefined，模块级常量会直接 JSCrash。
  */
-const TAB_BAR_STYLE: uiMaterial.ImmersiveStyle = uiMaterial.ImmersiveStyle.REGULAR;
 
 /**
  * 底栏材质。「光感」= 光感交互反馈，SDK 里由 lightEffect 提供，且文档明确写着
@@ -216,16 +390,24 @@ const TAB_BAR_STYLE: uiMaterial.ImmersiveStyle = uiMaterial.ImmersiveStyle.REGUL
  * 而 interactive 默认 false、lightEffect 默认 undefined —— 只设 style 时底栏静动无反馈，
  * 观感即"看不出材质"。两者必须显式开。
  */
-export function tabBarMaterial(): uiMaterial.ImmersiveMaterial {
-  // 蓝档：与工具条（plainButtonMaterial）同源，底栏与 Terminal/Acl 底键是同一组"操作位"
-  const lightEffect: uiMaterial.LightEffectOptions = { color: LIGHT_EFFECT_BLUE };
-  const options: uiMaterial.ImmersiveOptions = {
-    style: TAB_BAR_STYLE,
-    applyShadow: globalLevelName() !== 'SMOOTH',
-    interactive: true,
-    lightEffect: lightEffect
-  };
-  return new uiMaterial.ImmersiveMaterial(options);
+export function tabBarMaterial(): uiMaterial.ImmersiveMaterial | undefined {
+  if (!chromeAttributesSupported()) {
+    return undefined;
+  }
+  try {
+    // 蓝档：与工具条（plainButtonMaterial）同源，底栏与 Terminal/Acl 底键是同一组"操作位"
+    const lightEffect: uiMaterial.LightEffectOptions = { color: LIGHT_EFFECT_BLUE };
+    const options: uiMaterial.ImmersiveOptions = {
+      style: uiMaterial.ImmersiveStyle.REGULAR,
+      applyShadow: globalLevelName() !== 'SMOOTH',
+      interactive: true,
+      lightEffect: lightEffect
+    };
+    return new uiMaterial.ImmersiveMaterial(options);
+  } catch (e) {
+    hilog.error(0x0000, 'HapInstaller', 'tabBarMaterial threw: %{public}s', String(e));
+    return undefined;
+  }
 }
 
 /**
@@ -244,8 +426,8 @@ export function tabBarMaterial(): uiMaterial.ImmersiveMaterial {
  */
 export function hdsTitleBarStyle(isDark: boolean, subPage: boolean, enableBlur: boolean = true): TitleBarStyleOptions {
   const effect: SystemMaterialParams = {
-    materialType: hdsMaterial.MaterialType.ADAPTIVE,
-    materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE
+    materialType: HDS_MATERIAL_TYPE_ADAPTIVE,
+    materialLevel: HDS_MATERIAL_LEVEL_ADAPTIVE
   };
   const scrollOpts: ScrollEffectOptions = {
     enableScrollEffect: enableBlur,
@@ -286,6 +468,23 @@ export function hdsTitleBarStyle(isDark: boolean, subPage: boolean, enableBlur: 
   if (subPage && enableBlur) {
     style.blurStrategy = BlurStrategy.ENABLE;
   }
+  // ── 低版本实心档（API < 26）───────────────────────────────────────────────────
+  // 幕布在 21 上一像素都不画（取证见 LEGACY_SOLID_TITLE_BAR 注释），而内容仍穿过栏下滚 → 叠字。
+  // 这里把 originalStyle 与 scrollEffectStyle 两档底色**都**换成实心语义令牌：静止态与滚动态同色，
+  // 内容滚到栏底即被栏体挡掉（经典非沉浸栏观感）；blurStrategy 显式 DISABLE，
+  // 不去依赖一条画不出来的模糊带。
+  // ≥26 不进本分支 → 上面 Transparent / 留空两档（轮 8 十二档矩阵 C6/C7 签核态）逐像素不动。
+  if (legacySolidTitleBar()) {
+    const solid: HdsNavigationBackgroundStyle = { backgroundColor: legacyTitleBarBg() };
+    style.originalStyle = { contentStyle: contentStyle, backgroundStyle: solid };
+    style.scrollEffectStyle = { contentStyle: contentStyle, backgroundStyle: solid };
+    style.blurStrategy = BlurStrategy.DISABLE;
+    // 假设 1（2026-10-10）：HDS 在 systemMaterialEffect 存在时用材质层画栏底、**忽略** backgroundColor，
+    // 而材质层在本运行时零像素 → backgroundColor 白给。低版本档把材质与滚动特效一并摘掉，
+    // 让栏底回到「backgroundColor 直刷」这条 @18 就有的老路径。
+    style.systemMaterialEffect = undefined;
+    style.scrollEffectOpts = { enableScrollEffect: false };
+  }
   return style;
 }
 
@@ -312,21 +511,37 @@ export function hdsTitleBarOptions(mainTitle: ResourceStr, isDark: boolean,
 }
 
 /** 半模态抽屉材质：detent 抽屉比浮层更需要薄档，避免遮挡内容透色过度 */
-export function sheetMaterial(): uiMaterial.ImmersiveMaterial {
-  const options: uiMaterial.ImmersiveOptions = {
-    style: uiMaterial.ImmersiveStyle.REGULAR,
-    applyShadow: false
-  };
-  return new uiMaterial.ImmersiveMaterial(options);
+export function sheetMaterial(): uiMaterial.ImmersiveMaterial | undefined {
+  if (!chromeAttributesSupported()) {
+    return undefined;
+  }
+  try {
+    const options: uiMaterial.ImmersiveOptions = {
+      style: uiMaterial.ImmersiveStyle.REGULAR,
+      applyShadow: false
+    };
+    return new uiMaterial.ImmersiveMaterial(options);
+  } catch (e) {
+    hilog.error(0x0000, 'HapInstaller', 'sheetMaterial threw: %{public}s', String(e));
+    return undefined;
+  }
 }
 
 /** 确认弹窗材质：实测 state=DEFAULT 下 showDialog 不自动获得材质，需显式设置；浮层用厚档保文字对比度 */
-export function dialogMaterial(): uiMaterial.ImmersiveMaterial {
-  const options: uiMaterial.ImmersiveOptions = {
-    style: uiMaterial.ImmersiveStyle.THICK,
-    applyShadow: false
-  };
-  return new uiMaterial.ImmersiveMaterial(options);
+export function dialogMaterial(): uiMaterial.ImmersiveMaterial | undefined {
+  if (!chromeAttributesSupported()) {
+    return undefined;
+  }
+  try {
+    const options: uiMaterial.ImmersiveOptions = {
+      style: uiMaterial.ImmersiveStyle.THICK,
+      applyShadow: false
+    };
+    return new uiMaterial.ImmersiveMaterial(options);
+  } catch (e) {
+    hilog.error(0x0000, 'HapInstaller', 'dialogMaterial threw: %{public}s', String(e));
+    return undefined;
+  }
 }
 
 /**
@@ -340,13 +555,21 @@ export function dialogMaterial(): uiMaterial.ImmersiveMaterial {
  * REGULAR 档：这类控件面积小、文字本来就是语义前景，厚档会把底色推白、对比度反而过冲。
  * 光感（lightEffect）走白档，对齐二级页 HDS 内置返回键的白光；interactive 必须显式开，否则静动无反馈（见 tabBarMaterial 注释）。
  */
-export function buttonMaterial(): uiMaterial.ImmersiveMaterial {
-  const lightEffect: uiMaterial.LightEffectOptions = { color: LIGHT_EFFECT_WHITE };
-  const options: uiMaterial.ImmersiveOptions = {
-    style: uiMaterial.ImmersiveStyle.REGULAR,
-    applyShadow: false,
-    interactive: true,
-    lightEffect: lightEffect
-  };
-  return new uiMaterial.ImmersiveMaterial(options);
+export function buttonMaterial(): uiMaterial.ImmersiveMaterial | undefined {
+  if (!chromeAttributesSupported()) {
+    return undefined;
+  }
+  try {
+    const lightEffect: uiMaterial.LightEffectOptions = { color: LIGHT_EFFECT_WHITE };
+    const options: uiMaterial.ImmersiveOptions = {
+      style: uiMaterial.ImmersiveStyle.REGULAR,
+      applyShadow: false,
+      interactive: true,
+      lightEffect: lightEffect
+    };
+    return new uiMaterial.ImmersiveMaterial(options);
+  } catch (e) {
+    hilog.error(0x0000, 'HapInstaller', 'buttonMaterial threw: %{public}s', String(e));
+    return undefined;
+  }
 }

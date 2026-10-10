@@ -256,6 +256,10 @@ export default class EntryAbility extends UIAbility {
           win.getWindowAvoidArea(window.AvoidAreaType.TYPE_NAVIGATION_INDICATOR);
         AppStorage.setOrCreate<number>('safeTopPx', sysArea.topRect.height);
         AppStorage.setOrCreate<number>('safeBottomPx', navArea.bottomRect.height);
+        // 底栏安全边距的取证行：低版本经典档的 margin 直接吃 safeBottomPx，
+        // 观感异常时先看这条是不是 0（0 = 该机型/导航模式下指示条避让区为空，属正常）。
+        hilog.info(0x0000, 'HapInstaller', 'safe area: top=%{public}s bottom=%{public}s',
+          String(sysArea.topRect.height), String(navArea.bottomRect.height));
         // 悬浮工具条的 barWidth 只能是绝对 vp（FloatingTabBarWidth 不支持百分比，也未写超宽是否截断），
         // 二级页要让栏体接近满宽 → 由窗口实际宽度换算，而不是按某台设备写死。
         AppStorage.setOrCreate<number>('winWidthPx', win.getWindowProperties().windowRect.width);
